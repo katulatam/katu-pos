@@ -1,0 +1,6 @@
+# Saltos de línea de Linux en el repositorio (los servidores son Linux)
+* text=auto eol=lf
+*.bat text eol=crlf
+*.png binary
+*.ico binary
+*.jpg binary

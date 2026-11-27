@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <title>Katú</title>
+  <link rel="icon" href="/assets/img/favicon.ico">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Sora:wght@600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
+  <link rel="stylesheet" href="/tienda/tienda.css">
+</head>
+<body>
+<header class="cab"><div><div class="logo" id="lg"></div><div class="sp"><h1 id="nm"></h1></div><button class="pill ubi" id="ub"><i class="fa-solid fa-location-dot"></i><span>¿Dónde estás?</span></button><a class="pill" id="cu" aria-label="Mi cuenta"><i class="fa-solid fa-user"></i><span class="oc">Mi cuenta</span></a></div></header>
+<main><div id="av"></div><div class="bus"><i class="fa-solid fa-magnifying-glass"></i><input id="q" placeholder="¿Qué necesitas hoy?" aria-label="Buscar productos"></div><div class="cats" id="ct"></div><div id="pr"></div></main>
+<a class="carro" id="ca" hidden><span class="n"></span><span>Ver mi pedido</span><b></b></a>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+<script src="/assets/js/motor.js"></script><script src="/tienda/tienda.js"></script>
+<script>
+(async function () {
+  const d = await cargar(); if (!d) return;
+  let cat = '';
+  $('lg').innerHTML = logo(d.empresa); $('nm').textContent = d.empresa.nombre; $('cu').href = '/tienda/cuenta.html?t=' + slug; $('ca').href = '/tienda/pago.html?t=' + slug;
+  const sin = s => String(s || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
+  async function cobertura() {
+    const l = lugar.leer(); if (!l) return;
+    $('ub').querySelector('span').textContent = l.direccion;
+    const r = await api(`/tienda/t/${slug}/cotizar`, 'POST', { lat: l.lat, lng: l.lng, total: calcular().totalProductos });
+    if (!r.success) return; const c = r.data;
+    $('av').innerHTML = !c.cubre ? `<div class="av m"><i class="fa-solid fa-circle-xmark"></i><span>Tu dirección está fuera de la zona de domicilios.${d.empresa.recoger ? ' Puedes pedir y recoger en la tienda.' : ''}</span></div>` : !c.abierta ? `<div class="av i"><i class="fa-solid fa-clock"></i><span>Cerrado en este momento${c.horario ? `. Atiende de ${esc(c.horario)}` : ''}.</span></div>` : `<div class="av b"><i class="fa-solid fa-motorcycle"></i><span>Llegamos a tu casa en unos ${c.minutos} min por ${c.tarifa ? dinero(c.tarifa) : 'domicilio gratis'}${c.gratisDesde && c.tarifa ? `. Gratis desde ${dinero(c.gratisDesde)}` : ''}${c.pedidoMinimo ? `. Pedido mínimo ${dinero(c.pedidoMinimo)}` : ''}.</span></div>`;
+  }
+  function tarjeta(p) {
+    const c = d.cats.get(p.categoria) || {}, q = carro.leer()[p._id];
+    const pr = d.promociones.find(x => Motor.promoVigente(x, Motor.ahoraEnZona(d.empresa.zonaHoraria)) && (x.alcance === 'todo' || x.objetivos.includes(x.alcance === 'categoria' ? p.categoria : p._id)));
+    return `<article class="p ${p.agotado ? 'ag' : ''}" style="--k:${esc(c.color || '#05A5BC')}"><div class="im">${p.imagenUrl ? `<img src="${esc(p.imagenUrl)}" alt="" loading="lazy">` : `<i class="fa-solid ${esc(c.icono || 'fa-box')}"></i>`}</div>${pr ? `<span class="of">${pr.tipo === 'porcentaje' ? `−${pr.valor}%` : pr.tipo === 'nxm' ? `${pr.lleva}×${pr.paga}` : 'Oferta'}</span>` : ''}<div class="nm">${esc(p.nombre)}</div><small>${esc(p.descripcion || p.marca || '')}</small><div class="pie"><span class="pv">${dinero(p.precio)}${p.tipo === 'peso' ? ` <small>/${p.unidad}</small>` : ''}</span>${p.agotado ? '<small>Agotado</small>' : q ? `<span class="cnt"><button data-m="${p._id}" aria-label="Quitar">−</button><b>${cant(q, p)}</b><button data-a="${p._id}" aria-label="Agregar">+</button></span>` : `<button class="mas" data-a="${p._id}" aria-label="Agregar ${esc(p.nombre)}"><i class="fa-solid fa-plus"></i></button>`}</div></article>`;
+  }
+  function pintar() {
+    const q = sin($('q').value.trim());
+    $('ct').innerHTML = `<button data-c="" class="${cat ? '' : 'on'}">Todo</button>` + d.categorias.filter(c => d.productos.some(p => p.categoria === c._id)).map(c => `<button data-c="${c._id}" class="${cat === c._id ? 'on' : ''}" style="--k:${esc(c.color)}"><i class="fa-solid ${esc(c.icono)}"></i>${esc(c.nombre)}</button>`).join('');
+    let h = '';
+    if (q) { const l = d.productos.filter(p => sin(p.nombre + ' ' + p.marca).includes(q)); h = l.length ? `<div class="rej">${l.map(tarjeta).join('')}</div>` : '<div class="caja" style="text-align:center">No encontramos productos con esa búsqueda.</div>'; }
+    else { const gr = cat ? [d.cats.get(cat)] : d.categorias; h = gr.map(c => { const l = d.productos.filter(p => p.categoria === c._id); return l.length ? `<h2>${esc(c.nombre)}</h2><div class="rej">${l.map(tarjeta).join('')}</div>` : ''; }).join(''); const s = d.productos.filter(p => !p.categoria || !d.cats.has(p.categoria)); if (!cat && s.length) h += `<h2>Otros</h2><div class="rej">${s.map(tarjeta).join('')}</div>`; }
+    $('pr').innerHTML = h; barra();
+  }
+  function barra() { const l = lineas(), c = calcular(); $('ca').hidden = !l.length; $('ca').querySelector('.n').textContent = l.length; $('ca').querySelector('b').textContent = dinero(c.totalProductos); }
+  $('pr').onclick = e => { const a = e.target.closest('[data-a]'), m = e.target.closest('[data-m]'); const id = a?.dataset.a || m?.dataset.m; if (!id) return; const p = d.idx.get(id), q = carro.leer()[id] || 0; carro.poner(id, q + (a ? (p.tipo === 'peso' && !q ? 0.5 : paso(p)) : -paso(p))); const art = e.target.closest('article'); art.outerHTML = tarjeta(p); barra(); };
+  $('ct').onclick = e => { const b = e.target.closest('button'); if (b) { cat = b.dataset.c; $('q').value = ''; pintar(); } };
+  $('q').oninput = pintar; $('ub').onclick = async () => { if (await elegirLugar(lugar.leer())) cobertura(); };
+  pintar(); cobertura();
+})();
+</script>
+</body>
+</html>

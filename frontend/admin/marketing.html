@@ -1,0 +1,140 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Katú POS</title>
+  <link rel="icon" href="../assets/img/favicon.ico">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Sora:wght@500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+  <link rel="stylesheet" href="pos-admin.css">
+  <style>
+    .tabs { display: flex; gap: 6px; }
+    .tabs button { border: 1px solid var(--border); background: var(--surface); border-radius: 10px; padding: 8px 14px; font-weight: 600; font-size: 13px; color: var(--muted); }
+    .tabs button.on { background: var(--primary-light); color: var(--primary); border-color: transparent; }
+    .vista { background: #E7FFDB; color: #0B1729; border-radius: 12px; padding: 12px 14px; font-size: 13.5px; line-height: 1.5; white-space: pre-wrap; max-width: 420px; box-shadow: 0 1px 1px rgba(11,23,41,.08); }
+    [data-tema="oscuro"] .vista { background: #005C4B; color: #E9EDEF; }
+    .cuenta { font-family: var(--titulo); font-size: 22px; font-weight: 800; }
+    .met { display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 10px; }
+    .met div { background: var(--sutil); border-radius: 12px; padding: 12px; } .met small { display: block; color: var(--muted); font-size: 11.5px; } .met b { font-family: var(--titulo); font-size: 20px; }
+  </style>
+</head>
+<body data-pagina="marketing">
+<main class="content"></main>
+<script src="../assets/js/motor.js"></script>
+<script src="pos-admin.js"></script>
+<script>
+(async function () {
+  if (!(await POS.listo)) return;
+  const main = document.querySelector('main');
+  const ADM = POS.user.rol === 'admin' || POS.esSuper;
+  let R = null, pestaña = 'campanas';
+  const EST = { borrador: ['Borrador', ''], programada: ['Programada', 'az'], enviando: ['Enviando', 'vi'], enviada: ['Enviada', 'ok'], pausada: ['Pausada', 'av'], cancelada: ['Cancelada', 'mal'] };
+  const SEG = { todos: 'Todos los que autorizaron', recientes: 'Compraron en los últimos días', inactivos: 'Sin comprar hace días', frecuentes: 'Clientes frecuentes', cumpleanos: 'Cumplen años este mes', nivel: 'Por nivel de gamificación' };
+  const textoSeg = s => s.tipo === 'recientes' ? `Compraron en los últimos ${s.dias || 30} días` : s.tipo === 'inactivos' ? `Sin comprar hace ${s.dias || 30} días` : s.tipo === 'frecuentes' ? `Con ${s.compras || 5}+ compras` : s.tipo === 'nivel' ? `Nivel ${s.nivel || ''}` : SEG[s.tipo] || 'Todos';
+
+  async function cargar() {
+    R = await datos('/marketing/resumen'); if (!R) return;
+    main.innerHTML = `<div class="head"><div><h1>Marketing</h1><p>Campañas por WhatsApp y correo para los clientes que autorizaron recibir promociones. Cada mensaje consume 1 de la bolsa.</p></div><div class="acts">${ADM ? '<button class="btn p" id="nueva"><i class="fa-solid fa-plus"></i> Nueva campaña</button>' : ''}</div></div>
+      ${R.simuladores.whatsapp || R.simuladores.correo ? `<div class="aviso i"><i class="fa-solid fa-flask"></i> Modo simulador${R.simuladores.whatsapp && R.simuladores.correo ? '' : R.simuladores.whatsapp ? ' en WhatsApp' : ' en correo'}: no se envía nada real.</div>` : ''}
+      <div class="kpis">
+        <div class="card"><div class="b"><small style="color:var(--muted)">Aceptan WhatsApp</small><span class="cuenta">${fnum(R.clientes.whatsapp)}</span><small style="color:var(--muted)">de ${fnum(R.clientes.total)} clientes</small></div></div>
+        <div class="card"><div class="b"><small style="color:var(--muted)">Aceptan correo</small><span class="cuenta">${fnum(R.clientes.correo)}</span><small style="color:var(--muted)">de ${fnum(R.clientes.total)} clientes</small></div></div>
+        <div class="card"><div class="b"><small style="color:var(--muted)">Bolsa de WhatsApp</small><span class="cuenta">${fnum(R.saldo.whatsapp)}</span><small style="color:var(--muted)">${R.whatsappListo ? 'mensajes disponibles' : 'WhatsApp de la empresa no activo'}</small></div></div>
+        <div class="card"><div class="b"><small style="color:var(--muted)">Bolsa de correos</small><span class="cuenta">${fnum(R.saldo.correo)}</span><small style="color:var(--muted)">${R.correoListo ? 'correos disponibles' : 'Correo no configurado en el servidor'}</small></div></div>
+      </div>
+      <div class="tabs" id="tabs"><button data-t="campanas">Campañas</button><button data-t="plantillas">Plantillas de WhatsApp</button></div>
+      <div class="card" id="cont"></div>`;
+    $('nueva') && ($('nueva').onclick = () => editar());
+    $('tabs').onclick = e => { const b = e.target.closest('[data-t]'); if (b) { pestaña = b.dataset.t; ver(); } };
+    ver();
+  }
+  async function ver() {
+    document.querySelectorAll('#tabs button').forEach(b => b.classList.toggle('on', b.dataset.t === pestaña));
+    if (pestaña === 'campanas') {
+      const l = await datos('/marketing/campanas'); if (!l) return;
+      tabla($('cont'), [{ t: 'Campaña', f: c => `<b>${esc(c.nombre)}</b><small>${fecha(c.createdAt)}${c.creadaPor ? ' · ' + esc(c.creadaPor.nombre) : ''}</small>` }, { t: 'Canal', f: c => c.canal === 'whatsapp' ? '<i class="fa-brands fa-whatsapp" style="color:#25D366"></i> WhatsApp' : '<i class="fa-solid fa-envelope" style="color:var(--primary)"></i> Correo' }, { t: 'Segmento', f: c => esc(textoSeg(c.segmento || {})) }, { t: 'Estado', f: c => `<span class="bd ${EST[c.estado][1]}">${EST[c.estado][0]}</span>${c.estado === 'programada' && c.programadaPara ? `<small>${fecha(c.programadaPara)}</small>` : ''}${c.motivoPausa && c.estado === 'pausada' ? `<small>${esc(c.motivoPausa)}</small>` : ''}` }, { t: 'Enviados', n: 1, f: c => `${fnum(c.totales.enviados)} / ${fnum(c.totales.destinatarios)}` }], l, { vacio: 'Aún no hay campañas', icono: 'fa-bullhorn', clic: c => detalle(c._id) });
+    } else {
+      const ps = await datos('/marketing/plantillas'); if (!ps) return;
+      $('cont').innerHTML = `<header><h3>Plantillas de marketing</h3><p>WhatsApp solo permite iniciar conversaciones con plantillas aprobadas por Meta (suele tardar de minutos a 24 horas).</p>${ADM && R.whatsappListo ? '<div class="r"><button class="btn p sm" id="np"><i class="fa-solid fa-plus"></i> Nueva plantilla</button></div>' : ''}</header><div id="tp"></div>`;
+      tabla($('tp'), [{ t: 'Nombre', f: p => `<b>${esc(p.nombre)}</b><small>${fecha(p.creada)}</small>` }, { t: 'Texto', f: p => `<div class="vista" style="font-size:12.5px;max-width:520px">${esc(p.cuerpo).replace(/\{\{1\}\}/g, '<b>{nombre}</b>')}</div>` }, { t: 'Estado', f: p => `<span class="bd ${p.estado === 'aprobada' ? 'ok' : p.estado === 'rechazada' ? 'mal' : 'av'}">${{ aprobada: 'Aprobada', rechazada: 'Rechazada', pendiente: 'En revisión de Meta' }[p.estado] || p.estado}</span>${p.motivo ? `<small>${esc(p.motivo)}</small>` : ''}` }], ps, { vacio: 'No hay plantillas', icono: 'fa-comment-dots' });
+      $('np') && ($('np').onclick = nuevaPlantilla);
+    }
+  }
+
+  function nuevaPlantilla() {
+    const m = modal({ titulo: 'Nueva plantilla de WhatsApp', html: `<div class="grid"><div class="f" style="grid-column:span 12"><label>Nombre interno</label><input class="in" id="pn" placeholder="promo_fin_de_semana"></div><div class="f" style="grid-column:span 12"><label>Texto del mensaje</label><textarea class="in" id="pc" style="min-height:120px" placeholder="Hola {nombre}, este fin de semana tenemos 20% de descuento en frutas y verduras. ¡Te esperamos!"></textarea><small>Usa {nombre} para el nombre del cliente. Si no lo incluyes, se agrega al final "Responde BAJA para no recibir más promociones". Evita textos engañosos o en mayúsculas: Meta puede rechazarla.</small></div><div class="f" style="grid-column:span 12"><label>Vista previa</label><div class="vista" id="pv"></div></div></div>`, pie: '<button class="btn p" data-s>Enviar a aprobación</button>' });
+    const pv = () => { const t = m.q('#pc').value.trim(); m.q('#pv').textContent = (t || '…').replace(/\{nombre\}/gi, 'Valentina') + (/BAJA/i.test(t) ? '' : '\n\nResponde BAJA para no recibir más promociones.'); };
+    m.q('#pc').oninput = pv; pv();
+    m.q('[data-s]').onclick = async () => { if (await datos('/marketing/plantillas', 'POST', { nombre: m.q('#pn').value, cuerpo: m.q('#pc').value })) { m.cerrar(); toast('Plantilla enviada a aprobación'); ver(); } };
+  }
+
+  function editar(c = null) {
+    const aprobadas = R.plantillas.filter(p => p.estado === 'aprobada');
+    const m = modal({ clase: 'l', titulo: c ? 'Editar campaña' : 'Nueva campaña', html: `<div class="grid">
+      <div class="f"><label>Nombre</label><input class="in" id="cn" value="${esc(c?.nombre || '')}" placeholder="Promo fin de semana"></div>
+      <div class="f"><label>Canal</label><select class="in" id="cc"><option value="whatsapp">WhatsApp (plantilla aprobada)</option><option value="correo">Correo</option></select></div>
+      <div class="f"><label>¿A quién?</label><select class="in" id="st">${Object.entries(SEG).filter(([k]) => k !== 'nivel' || R.niveles.length).map(([k, t]) => `<option value="${k}">${t}</option>`).join('')}</select></div>
+      <div class="f" id="sp"></div>
+      <div style="grid-column:span 12" class="aviso i" id="cuenta"><i class="fa-solid fa-users"></i> Calculando…</div>
+      <div class="f wa" style="grid-column:span 12"><label>Plantilla</label><select class="in" id="pl">${aprobadas.map(p => `<option value="${esc(p.contentSid)}">${esc(p.nombre)}</option>`).join('') || '<option value="">No hay plantillas aprobadas</option>'}</select></div>
+      <div class="f wa" style="grid-column:span 12"><label>Vista previa</label><div class="vista" id="vw"></div></div>
+      <div class="f co" style="grid-column:span 12"><label>Asunto</label><input class="in" id="as" value="${esc(c?.asunto || '')}" placeholder="{nombre}, esta semana tenemos ofertas para ti"></div>
+      <div class="f co" style="grid-column:span 12"><label>Mensaje</label><textarea class="in" id="cu" style="min-height:150px" placeholder="Hola {nombre}:&#10;&#10;Esta semana tenemos *20% de descuento* en frutas y verduras.">${esc(c?.cuerpo || '')}</textarea><small>{nombre} se reemplaza por el nombre del cliente. *texto* va en negrita. El correo lleva el logo y los colores de la empresa, y el enlace para darse de baja.</small></div>
+    </div>`, pie: '<button class="btn" data-g>Guardar borrador</button><button class="btn" data-t><i class="fa-solid fa-vial"></i> Enviarme una prueba</button><button class="btn p" data-p><i class="fa-solid fa-paper-plane"></i> Programar envío</button>' });
+    if (c) { m.q('#cc').value = c.canal; m.q('#st').value = c.segmento?.tipo || 'todos'; if (c.plantilla) m.q('#pl').value = c.plantilla; }
+    const seg = () => { const t = m.q('#st').value; return { tipo: t, ...(['recientes', 'inactivos'].includes(t) && { dias: Number(m.q('#sd')?.value) || 30 }), ...(t === 'frecuentes' && { compras: Number(m.q('#sc')?.value) || 5 }), ...(t === 'nivel' && { nivel: m.q('#sn')?.value }) }; };
+    const verSeg = () => { const t = m.q('#st').value; m.q('#sp').innerHTML = ['recientes', 'inactivos'].includes(t) ? `<label>Días</label><input class="in" id="sd" type="number" min="1" value="${c?.segmento?.dias || 30}">` : t === 'frecuentes' ? `<label>Compras mínimas</label><input class="in" id="sc" type="number" min="1" value="${c?.segmento?.compras || 5}">` : t === 'nivel' ? `<label>Nivel</label><select class="in" id="sn">${R.niveles.map(n => `<option ${c?.segmento?.nivel === n ? 'selected' : ''}>${esc(n)}</option>`).join('')}</select>` : ''; contar(); };
+    let tc; const contar = () => { clearTimeout(tc); tc = setTimeout(async () => { const canal = m.q('#cc').value; const r = await api('/marketing/segmento', 'POST', { canal, segmento: seg() }); if (!r.success) return; const saldo = R.saldo[canal]; m.q('#cuenta').innerHTML = `<i class="fa-solid fa-users"></i> <span><b>${fnum(r.data.total)}</b> clientes recibirán esta campaña (consume ${fnum(r.data.total)} de ${fnum(saldo)} en la bolsa).${r.data.total > saldo ? ' <b>La bolsa no alcanza:</b> la campaña se pausará al agotarse.' : ''}</span>`; }, 250); };
+    const verCanal = () => { const wa = m.q('#cc').value === 'whatsapp'; m.qq('.wa').forEach(x => { x.hidden = !wa; }); m.qq('.co').forEach(x => { x.hidden = wa; }); verPl(); contar(); };
+    const verPl = () => { const p = aprobadas.find(x => x.contentSid === m.q('#pl').value); m.q('#vw').textContent = p ? p.cuerpo.replace(/\{\{1\}\}/g, 'Valentina') : 'Crea una plantilla en la pestaña "Plantillas de WhatsApp" y espera la aprobación de Meta.'; };
+    m.q('#cc').onchange = verCanal; m.q('#st').onchange = verSeg; m.q('#pl').onchange = verPl;
+    m.q('#sp').oninput = contar;
+    const cuerpo = () => ({ nombre: m.q('#cn').value, canal: m.q('#cc').value, segmento: seg(), plantilla: m.q('#pl').value, asunto: m.q('#as').value, cuerpo: m.q('#cu').value });
+    let id = c?._id;
+    const guardar = async () => { const r = id ? await datos(`/marketing/campanas/${id}`, 'PUT', cuerpo()) : await datos('/marketing/campanas', 'POST', cuerpo()); if (r) id = r._id; return r; };
+    m.q('[data-g]').onclick = async () => { if (await guardar()) { m.cerrar(); toast('Borrador guardado'); ver(); } };
+    m.q('[data-t]').onclick = async () => {
+      const wa = m.q('#cc').value === 'whatsapp';
+      const x = modal({ clase: 's', titulo: 'Enviarme una prueba', html: `<div class="f"><label>${wa ? 'Tu celular' : 'Tu correo'}</label><input class="in" id="dp" ${wa ? 'inputmode="tel" placeholder="3001234567"' : 'type="email" placeholder="tu@correo.com"'}><small>Consume 1 mensaje de la bolsa.</small></div>`, pie: '<button class="btn p" data-ok>Enviar prueba</button>' });
+      x.q('[data-ok]').onclick = async () => {
+        const destino = x.q('#dp').value.trim(); if (!destino) return;
+        if (!(await guardar())) return;
+        if (await datos(`/marketing/campanas/${id}/prueba`, 'POST', { destino })) { x.cerrar(); toast('Prueba enviada'); }
+      };
+    };
+    m.q('[data-p]').onclick = () => {
+      const x = modal({ clase: 's', titulo: 'Programar envío', html: '<div class="f"><label>¿Cuándo?</label><select class="in" id="cu2"><option value="ya">Ahora mismo</option><option value="luego">En una fecha y hora</option></select></div><div class="f" id="fh" hidden style="margin-top:10px"><label>Fecha y hora (hora de la empresa)</label><input class="in" type="datetime-local" id="dt"></div>', pie: '<button class="btn p" data-ok>Programar</button>' });
+      x.q('#cu2').onchange = () => { x.q('#fh').hidden = x.q('#cu2').value !== 'luego'; };
+      x.q('[data-ok]').onclick = async () => {
+        const luego = x.q('#cu2').value === 'luego';
+        if (luego && !x.q('#dt').value) return toast('Elige la fecha y hora', 'mal');
+        if (!(await guardar())) return;
+        const r = await datos(`/marketing/campanas/${id}/programar`, 'POST', luego ? { cuando: new Date(x.q('#dt').value).toISOString() } : {});
+        if (r) { x.cerrar(); m.cerrar(); toast(`Programada para ${fnum(r.destinatarios)} clientes${r.alcanza ? '' : ' (la bolsa no alcanza para todos)'}`); cargar(); }
+      };
+    };
+    verSeg(); verCanal();
+  }
+
+  async function detalle(id) {
+    const c = await datos('/marketing/campanas/' + id); if (!c) return;
+    const p = c.porEstado || {}, a = c.atribucion;
+    const m = modal({ clase: 'l', titulo: `${esc(c.nombre)} <span class="bd ${EST[c.estado][1]}" style="margin-left:8px">${EST[c.estado][0]}</span>`, html: `
+      <p style="color:var(--muted);margin-bottom:14px">${c.canal === 'whatsapp' ? `WhatsApp · plantilla ${esc(c.plantillaNombre || '')}` : `Correo · ${esc(c.asunto || '')}`} · ${esc(textoSeg(c.segmento || {}))}${c.programadaPara ? ` · ${fecha(c.programadaPara)}` : ''}${c.motivoPausa && c.estado === 'pausada' ? `<br><b style="color:var(--warning)">${esc(c.motivoPausa)}</b>` : ''}</p>
+      <div class="met"><div><small>Destinatarios</small><b>${fnum(c.totales.destinatarios)}</b></div><div><small>Enviados</small><b>${fnum(c.totales.enviados)}</b></div>${c.canal === 'whatsapp' ? `<div><small>Entregados</small><b>${fnum((p.entregado || 0) + (p.leido || 0))}</b></div><div><small>Leídos</small><b>${fnum(p.leido || 0)}</b></div>` : ''}<div><small>Fallidos</small><b>${fnum(c.totales.fallidos)}</b></div><div><small>Omitidos (se dieron de baja)</small><b>${fnum(c.totales.omitidos)}</b></div></div>
+      <div class="card" style="margin-top:14px"><div class="b"><b>Ventas atribuidas</b><p style="color:var(--muted);font-size:12.5px">Compras de los destinatarios en los ${a.dias} días siguientes a su mensaje.</p><div class="met"><div><small>Clientes que compraron</small><b>${fnum(a.compradores)}</b></div><div><small>Compras</small><b>${fnum(a.ventas)}</b></div><div><small>Total vendido</small><b>${dinero(a.total)}</b></div></div></div></div>
+      <div style="margin-top:14px"><label style="font-size:12px;font-weight:600;color:var(--muted)">Mensaje</label><div class="vista" style="margin-top:6px">${esc(String(c.cuerpo || '').replace(/\{\{1\}\}/g, '{nombre}'))}</div></div>`,
+      pie: ADM ? `${['borrador', 'programada'].includes(c.estado) ? '<button class="btn" data-a="editar">Editar</button>' : ''}${['enviando', 'programada'].includes(c.estado) ? '<button class="btn" data-a="pausar"><i class="fa-solid fa-pause"></i> Pausar</button>' : ''}${c.estado === 'pausada' ? '<button class="btn p" data-a="reanudar"><i class="fa-solid fa-play"></i> Reanudar</button>' : ''}${['borrador', 'programada', 'pausada', 'enviando'].includes(c.estado) ? '<button class="btn d" data-a="cancelar">Cancelar campaña</button>' : ''}` : '' });
+    m.el.querySelector('footer')?.addEventListener('click', async e => {
+      const ac = e.target.closest('[data-a]')?.dataset.a; if (!ac) return;
+      if (ac === 'editar') { m.cerrar(); return editar(c); }
+      if (ac === 'cancelar' && !(await confirmar('Cancelar campaña', 'Los mensajes que faltan no se enviarán.', 'Cancelar campaña'))) return;
+      if (await datos(`/marketing/campanas/${id}/${ac}`, 'POST')) { m.cerrar(); toast('Listo'); cargar(); }
+    });
+  }
+  cargar();
+})();
+</script>
+</body>
+</html>

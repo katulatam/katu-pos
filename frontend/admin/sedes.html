@@ -1,0 +1,29 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Katú POS</title>
+  <link rel="icon" href="../assets/img/favicon.ico">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Sora:wght@500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
+  <link rel="stylesheet" href="pos-admin.css">
+</head>
+<body data-pagina="sedes">
+<main class="content"></main>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+<script src="../assets/js/motor.js"></script>
+<script src="pos-admin.js"></script>
+<script>
+(async function () {
+  if (!(await POS.listo)) return;
+
+  crud({ ruta: '/sedes', titulo: 'Sedes', sub: 'Cada sede tiene su inventario, sus cajas y su punto de despacho.', nuevo: 'Nueva sede', icono: 'fa-store', clase: 'l',
+    columnas: [{ t: 'Sede', f: s => `<b>${esc(s.nombre)}</b><small>${esc([s.direccion, s.ciudad].filter(Boolean).join(', '))}</small>` }, { t: 'Zona horaria', f: s => esc(s.zonaHoraria || POS.empresa.zonaHoraria) }, { t: 'Mapa', f: s => si(!!s.ubicacion?.lat, 'Ubicada', 'Sin ubicar') }, { t: 'Domicilios', f: s => si(s.atiendeDomicilios, 'Despacha', 'No') }, { t: 'Estado', f: s => si(s.activo, 'Activa', 'Inactiva') }],
+    campos: [{ k: 'nombre', l: 'Nombre', req: 1 }, { k: 'telefono', l: 'Teléfono' }, { k: 'direccion', l: 'Dirección' }, { k: 'ciudad', l: 'Ciudad' }, { k: 'zonaHoraria', l: 'Zona horaria', t: 'lista', vacio: 'La de la empresa', op: POS.pais.zonasHorarias }, { k: 'atiendeDomicilios', l: 'Despacha domicilios', t: 'si', def: true }, { k: 'activo', l: 'Activa', t: 'si', def: true }],
+    alAbrir: (x, s) => { let u = s?.ubicacion?.lat ? { lat: s.ubicacion.lat, lng: s.ubicacion.lng } : null, mk; x.innerHTML = '<p style="margin:16px 0 8px;font-weight:600;font-size:13px">Toca el mapa para ubicar la sede <button class="btn sm" type="button" id="gp"><i class="fa-solid fa-location-crosshairs"></i> Usar mi ubicación</button></p><div class="mapa" style="height:300px"></div>'; const mp = L.map(x.querySelector('.mapa')).setView(u ? [u.lat, u.lng] : [4.65, -74.06], u ? 16 : 5); L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19, attribution: '© OpenStreetMap' }).addTo(mp); const p = () => { mk?.remove(); if (u) mk = L.marker([u.lat, u.lng]).addTo(mp); }; mp.on('click', e => { u = { lat: e.latlng.lat, lng: e.latlng.lng }; p(); }); setTimeout(() => { mp.invalidateSize(); p(); }, 80); x.querySelector('#gp').onclick = () => navigator.geolocation?.getCurrentPosition(g => { u = { lat: g.coords.latitude, lng: g.coords.longitude }; mp.setView([u.lat, u.lng], 17); p(); }, () => toast('No se pudo obtener la ubicación', 'mal')); return () => (u ? { ubicacion: u } : {}); } }).cargar();
+})();
+</script>
+</body>
+</html>

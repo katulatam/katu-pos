@@ -1,0 +1,264 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Katú POS</title>
+  <link rel="icon" href="../assets/img/favicon.ico">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Sora:wght@500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
+  <link rel="stylesheet" href="pos-admin.css">
+  <style>
+    .wa { display: grid; grid-template-columns: 320px minmax(0, 1fr) 300px; gap: 14px; height: calc(100vh - 170px); min-height: 520px; }
+    .wa > .card { display: flex; flex-direction: column; }
+    .wa-tabs { display: flex; gap: 4px; padding: 10px; border-bottom: 1px solid var(--border); flex-wrap: wrap; }
+    .wa-tabs button { border: none; background: none; padding: 7px 11px; border-radius: 9px; font-weight: 600; font-size: 12.5px; color: var(--muted); display: flex; gap: 6px; align-items: center; }
+    .wa-tabs button.on { background: var(--primary-light); color: var(--primary); }
+    .wa-tabs .n { background: var(--danger); color: #fff; border-radius: 10px; padding: 0 6px; font-size: 10.5px; }
+    .wa-lista { flex: 1; overflow-y: auto; }
+    .wa-it { width: 100%; text-align: left; border: none; background: none; display: grid; grid-template-columns: 40px 1fr auto; gap: 10px; padding: 12px 14px; border-bottom: 1px solid var(--border); align-items: center; }
+    .wa-it:hover { background: var(--sutil); } .wa-it.on { background: var(--primary-light); }
+    .wa-av { width: 40px; height: 40px; border-radius: 50%; display: grid; place-items: center; font-weight: 800; font-size: 13px; background: var(--violeta-light); color: var(--violeta); }
+    .wa-it b { display: block; font-size: 13.5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .wa-it small { display: block; color: var(--muted); font-size: 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .wa-it .r { text-align: right; font-size: 11px; color: var(--faint); display: flex; flex-direction: column; gap: 4px; align-items: flex-end; }
+    .wa-it .r .n { background: #25D366; color: #fff; border-radius: 10px; padding: 1px 7px; font-weight: 700; }
+    .wa-chat > header { gap: 12px; }
+    .wa-msgs { flex: 1; overflow-y: auto; padding: 18px; display: flex; flex-direction: column; gap: 6px; background: var(--sutil); }
+    .wa-m { max-width: 72%; padding: 9px 12px 6px; border-radius: 14px; font-size: 13.5px; line-height: 1.45; white-space: pre-wrap; word-break: break-word; box-shadow: 0 1px 1px rgba(11,23,41,.06); }
+    .wa-m.ent { align-self: flex-start; background: var(--surface); border-top-left-radius: 4px; }
+    .wa-m.out { align-self: flex-end; background: #D9FDD3; color: #0B1729; border-top-right-radius: 4px; }
+    [data-tema="oscuro"] .wa-m.out { background: #005C4B; color: #E9EDEF; }
+    .wa-m.sis { align-self: flex-end; background: var(--primary-light); color: var(--text); }
+    .wa-m.bot { align-self: flex-end; background: var(--violeta-light); color: var(--text); border-top-right-radius: 4px; }
+    .wa-m .meta { display: flex; gap: 6px; justify-content: flex-end; align-items: center; font-size: 10.5px; color: var(--faint); margin-top: 3px; }
+    .wa-m .meta .ok { color: #53BDEB; } .wa-m .meta .mal { color: var(--danger); }
+    .wa-m img { max-width: 260px; max-height: 260px; border-radius: 10px; display: block; margin-bottom: 4px; cursor: zoom-in; }
+    .wa-m .ub { display: flex; gap: 8px; align-items: center; font-weight: 600; }
+    .wa-dia { align-self: center; font-size: 11.5px; color: var(--muted); background: var(--surface); padding: 3px 10px; border-radius: 10px; margin: 6px 0; }
+    .wa-comp { display: flex; gap: 8px; padding: 12px; border-top: 1px solid var(--border); align-items: flex-end; }
+    .wa-comp textarea { flex: 1; min-height: 42px; max-height: 140px; resize: none; }
+    .wa-aviso { padding: 10px 14px; font-size: 12.5px; background: var(--warning-light); color: var(--warning); border-top: 1px solid var(--border); display: flex; gap: 8px; align-items: center; }
+    .wa-lado .b { overflow-y: auto; }
+    .wa-mapa { height: 160px; border-radius: 12px; overflow: hidden; }
+    .wa-ped { display: flex; justify-content: space-between; gap: 8px; font-size: 12.5px; padding: 8px 0; border-bottom: 1px solid var(--border); }
+    .wa-lin { display: grid; grid-template-columns: 1fr 110px 90px 34px; gap: 8px; align-items: center; padding: 6px 0; border-bottom: 1px solid var(--border); font-size: 13px; }
+    .wa-mapa-g { height: 240px; border-radius: 12px; overflow: hidden; }
+    @media (max-width: 1250px) { .wa { grid-template-columns: 280px minmax(0, 1fr); } .wa-lado { display: none !important; } }
+    @media (max-width: 800px) { .wa { grid-template-columns: 1fr; height: auto; } .wa-chat { min-height: 70vh; } }
+  </style>
+</head>
+<body data-pagina="whatsapp">
+<main class="content"></main>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+<script src="../assets/js/motor.js"></script>
+<script src="pos-admin.js"></script>
+<script>
+(async function () {
+  if (!(await POS.listo)) return;
+  const main = document.querySelector('main');
+  let R = await datos('/whatsapp/resumen'); if (!R) return;
+  let filtro = R.enEspera ? 'espera' : 'activas', lista = [], actual = null, desde = 0, tLista, tChat, enEsperaAntes = R.enEspera;
+  const yo = POS.user._id || POS.user.id;
+
+  main.innerHTML = `<div class="head"><div><h1>WhatsApp</h1><p id="sub"></p></div><div class="acts" id="acts"></div></div>
+    ${R.listo ? '' : `<div class="aviso m"><i class="fa-solid fa-triangle-exclamation"></i> El WhatsApp de la empresa aún no está activo. ${POS.esSuper ? 'Configúralo en <a href="whatsapp-config.html">WhatsApp y mensajes</a>.' : 'Pide al equipo de Katú que lo configure.'}</div>`}
+    <div class="wa">
+      <section class="card"><div class="wa-tabs" id="tabs"></div><div style="padding:10px;border-bottom:1px solid var(--border)"><input class="in" id="q" placeholder="Buscar nombre o celular"></div><div class="wa-lista" id="lista"></div></section>
+      <section class="card wa-chat" id="chat"><div class="nada" style="margin:auto"><i class="fa-brands fa-whatsapp"></i>Elige una conversación</div></section>
+      <aside class="card wa-lado" id="lado"><div class="nada" style="margin:auto"><i class="fa-solid fa-user"></i>Datos del cliente</div></aside>
+    </div>`;
+  const pintarCab = () => {
+    $('sub').textContent = `${R.numero ? R.numero + ' · ' : ''}${R.enEspera} en espera · ${R.mias} atendiendo${R.bot ? ` · ${R.conBot} con el bot` : ''}${R.simulador ? ' · modo simulador' : ''}`;
+    $('acts').innerHTML = R.simulador ? '<button class="btn" id="sim"><i class="fa-solid fa-flask"></i> Simular cliente</button>' : '';
+    $('sim') && ($('sim').onclick = simular);
+    $('tabs').innerHTML = [['espera', 'En espera', R.enEspera], ['mias', 'Mías', R.mias], ...(R.bot || R.conBot ? [['bot', 'Con el bot', R.conBot, 1]] : []), ['activas', 'Activas'], ['cerradas', 'Cerradas']].map(([k, t, n, gris]) => `<button data-f="${k}" class="${filtro === k ? 'on' : ''}">${t}${n ? `<span class="n" ${gris ? 'style="background:var(--violeta)"' : ''}>${n}</span>` : ''}</button>`).join('');
+    document.title = `${R.sinLeer ? `(${R.sinLeer}) ` : ''}WhatsApp — Katú POS`;
+  };
+  $('tabs').onclick = e => { const b = e.target.closest('[data-f]'); if (b) { filtro = b.dataset.f; pintarCab(); cargarLista(); } };
+  let tq; $('q').oninput = () => { clearTimeout(tq); tq = setTimeout(cargarLista, 250); };
+
+  const hora = d => new Date(d).toLocaleTimeString(POS.pais.locale, { timeZone: POS.empresa.zonaHoraria, hour: '2-digit', minute: '2-digit' });
+  const dia = d => new Date(d).toLocaleDateString(POS.pais.locale, { timeZone: POS.empresa.zonaHoraria, weekday: 'long', day: 'numeric', month: 'long' });
+  const cuando = d => { const x = new Date(d); return Date.now() - x < 86400000 ? hora(d) : x.toLocaleDateString(POS.pais.locale, { timeZone: POS.empresa.zonaHoraria, day: 'numeric', month: 'short' }); };
+  const ESTADO = { espera: ['En espera', 'av'], asesor: ['Atendiendo', 'az'], bot: ['Bot', 'vi'], cerrada: ['Cerrada', ''] };
+
+  async function cargarLista() {
+    const d = await api(`/whatsapp/conversaciones?filtro=${filtro}&q=${encodeURIComponent($('q').value.trim())}`); if (!d.success) return;
+    lista = d.data;
+    $('lista').innerHTML = lista.map(c => `<button class="wa-it ${actual?._id === c._id ? 'on' : ''}" data-c="${c._id}"><span class="wa-av">${esc(iniciales(c.nombre) || '#')}</span><span style="min-width:0"><b>${esc(c.nombre || c.telefono)}</b><small>${esc(c.ultimoTexto)}</small>${c.asesor && filtro !== 'mias' ? `<small><i class="fa-solid fa-headset"></i> ${esc(c.asesor.nombre)}</small>` : ''}</span><span class="r">${cuando(c.ultimoEn)}${c.sinLeer ? `<span class="n">${c.sinLeer}</span>` : ''}</span></button>`).join('') || '<div class="nada">No hay conversaciones</div>';
+  }
+  $('lista').onclick = e => { const b = e.target.closest('[data-c]'); if (b) abrir(b.dataset.c); };
+  async function refrescar() {
+    const r = await api('/whatsapp/resumen'); if (r.success) { R = r.data; if (R.enEspera > enEsperaAntes) { toast('Nueva conversación en espera'); sonar(); } enEsperaAntes = R.enEspera; pintarCab(); }
+    cargarLista();
+  }
+  let audio; function sonar() { try { audio = audio || new AudioContext(); const o = audio.createOscillator(), g = audio.createGain(); o.frequency.value = 880; g.gain.setValueAtTime(.05, audio.currentTime); g.gain.exponentialRampToValueAtTime(.0001, audio.currentTime + .25); o.connect(g).connect(audio.destination); o.start(); o.stop(audio.currentTime + .3); } catch {} }
+
+  // ── Conversación ──
+  const marca = m => m.direccion === 'entrante' ? '' : { enviando: '<i class="fa-regular fa-clock"></i>', enviado: '<i class="fa-solid fa-check"></i>', entregado: '<i class="fa-solid fa-check-double"></i>', leido: '<i class="fa-solid fa-check-double ok"></i>', fallido: `<i class="fa-solid fa-circle-exclamation mal" title="${esc(m.error || 'No se entregó')}"></i>` }[m.estado] || '';
+  function burbuja(m) {
+    const cls = m.direccion === 'entrante' ? 'ent' : m.autor === 'sistema' ? 'sis' : m.autor === 'bot' ? 'bot' : 'out';
+    const quien = m.direccion === 'saliente' ? (m.autor === 'sistema' ? (m.plantilla ? 'Plantilla automática' : 'Automático') : m.autor === 'bot' ? '<i class="fa-solid fa-robot"></i> Asistente IA' : esc(m.usuario || 'Asesor')) : '';
+    return `<div class="wa-m ${cls}" data-m="${m._id}">${m.media.map(x => /^image\//.test(x.tipo || '') ? `<img data-src="${esc(x.url)}" alt="Imagen del cliente">` : `<a href="#" data-arch="${esc(x.url)}"><i class="fa-solid fa-paperclip"></i> Archivo</a>`).join('')}${m.ubicacion ? `<div class="ub"><i class="fa-solid fa-location-dot" style="color:var(--danger)"></i>${esc(m.ubicacion.direccion || 'Ubicación compartida')}</div>` : ''}${esc(m.texto)}<div class="meta">${quien ? `<span>${quien}</span>` : ''}<span>${hora(m.en)}</span>${marca(m)}</div></div>`;
+  }
+  const TOKEN = localStorage.getItem('katu_admin_token');
+  const cabeza = () => ({ Authorization: 'Bearer ' + TOKEN, ...(POS.esSuper && localStorage.getItem('katu_admin_empresa') && { 'x-empresa': localStorage.getItem('katu_admin_empresa') }) });
+  async function archivo(url) { const r = await fetch(url, { headers: cabeza() }); if (!r.ok) throw new Error('No se pudo cargar el archivo'); return URL.createObjectURL(await r.blob()); }
+  function cargarMedia(cont) { cont.querySelectorAll('img[data-src]').forEach(async i => { const u = i.dataset.src; i.removeAttribute('data-src'); try { i.src = await archivo(u); i.onclick = () => window.open(i.src); } catch { i.replaceWith(document.createTextNode('(imagen no disponible)')); } }); }
+  function pintarMensajes(ms, todo) {
+    const c = $('msgs'); if (!c) return;
+    const abajo = c.scrollHeight - c.scrollTop - c.clientHeight < 80;
+    if (todo) { let d0 = ''; c.innerHTML = ms.map(m => { const d1 = dia(m.en); const sep = d1 !== d0 ? `<div class="wa-dia">${d1}</div>` : ''; d0 = d1; return sep + burbuja(m); }).join('') || '<div class="nada">Sin mensajes</div>'; }
+    else ms.forEach(m => { const ex = c.querySelector(`[data-m="${m._id}"]`); const t = document.createElement('div'); t.innerHTML = burbuja(m); if (ex) ex.replaceWith(t.firstChild); else { c.querySelector('.nada')?.remove(); c.append(t.firstChild); } });
+    cargarMedia(c);
+    if (todo || abajo) c.scrollTop = c.scrollHeight;
+  }
+  async function abrir(id) {
+    clearInterval(tChat);
+    const d = await datos('/whatsapp/conversaciones/' + id); if (!d) return;
+    actual = d; desde = Date.now();
+    document.querySelectorAll('.wa-it').forEach(b => b.classList.toggle('on', b.dataset.c === id));
+    pintarChat(); pintarLado();
+    pintarMensajes(d.mensajes, true);
+    if (d.sinLeer) api(`/whatsapp/conversaciones/${id}/leida`, 'POST').then(refrescar);
+    tChat = setInterval(nuevos, 3000);
+  }
+  function pintarChat() {
+    const c = actual, mia = c.estado === 'asesor' && c.asesor?._id === yo, jefe = ['admin', 'supervisor', 'super'].includes(POS.user.rol);
+    const [et, cl] = ESTADO[c.estado] || ['', ''];
+    $('chat').innerHTML = `<header><span class="wa-av">${esc(iniciales(c.nombre) || '#')}</span><div><h3>${esc(c.nombre || c.telefono)}</h3><p>${esc(c.telefono)} · <span class="bd ${cl}">${et}${c.asesor && c.estado === 'asesor' ? ' · ' + esc(c.asesor.nombre) : ''}</span></p></div><div class="r">
+      ${c.estado !== 'asesor' || (!mia && jefe) ? '<button class="btn sm" data-a="tomar"><i class="fa-solid fa-hand"></i> Tomar</button>' : ''}
+      ${c.estado === 'asesor' && (mia || jefe) ? '<button class="btn sm" data-a="liberar"><i class="fa-solid fa-arrow-rotate-left"></i> Devolver a la cola</button>' : ''}
+      ${R.bot && c.estado !== 'bot' && c.estado !== 'cerrada' ? '<button class="btn sm" data-a="bot"><i class="fa-solid fa-robot"></i> Pasar al bot</button>' : ''}
+      ${c.estado !== 'cerrada' ? '<button class="btn sm" data-a="cerrar"><i class="fa-solid fa-check"></i> Cerrar</button>' : ''}</div></header>
+      <div class="wa-msgs" id="msgs"></div>
+      ${c.estado === 'bot' ? '<div class="wa-aviso" style="background:var(--violeta-light);color:var(--violeta)"><i class="fa-solid fa-robot"></i> El asistente de IA está atendiendo. Si escribes o tomas la conversación, el bot deja de responder.</div>' : ''}${c.ventanaAbierta ? '' : '<div class="wa-aviso"><i class="fa-solid fa-clock"></i> Pasaron más de 24 horas desde el último mensaje del cliente. WhatsApp no permite escribirle hasta que vuelva a escribir.</div>'}
+      <div class="wa-comp"><textarea class="in" id="txt" placeholder="${c.ventanaAbierta ? 'Escribe una respuesta… (Enter envía, Shift+Enter salto de línea)' : 'Ventana de 24 h cerrada'}" ${c.ventanaAbierta && R.listo ? '' : 'disabled'}></textarea><button class="btn p" id="env" ${c.ventanaAbierta && R.listo ? '' : 'disabled'}><i class="fa-solid fa-paper-plane"></i></button></div>`;
+    $('chat').querySelector('header .r').onclick = async e => {
+      const a = e.target.closest('[data-a]')?.dataset.a; if (!a) return;
+      if (a === 'cerrar' && !(await confirmar('Cerrar conversación', 'Si el cliente vuelve a escribir, se abre de nuevo en la cola.', 'Cerrar'))) return;
+      if (await datos(`/whatsapp/conversaciones/${c._id}/${a}`, 'POST')) { await abrir(c._id); refrescar(); }
+    };
+    const t = $('txt'), enviar = async () => {
+      const texto = t.value.trim(); if (!texto) return;
+      t.disabled = true; $('env').disabled = true;
+      const r = await api(`/whatsapp/conversaciones/${c._id}/mensajes`, 'POST', { texto });
+      t.disabled = false; $('env').disabled = false; t.focus();
+      if (!r.success) return toast(r.error, 'mal');
+      t.value = ''; pintarMensajes([r.data]);
+      if (actual.estado !== 'asesor') { actual.estado = 'asesor'; actual.asesor = { _id: yo, nombre: POS.user.nombre }; pintarChat(); pintarMensajes(actual.mensajes = [...actual.mensajes, r.data], true); refrescar(); }
+    };
+    $('env').onclick = enviar;
+    t.onkeydown = e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); enviar(); } };
+    t.oninput = () => { t.style.height = 'auto'; t.style.height = Math.min(140, t.scrollHeight) + 'px'; };
+  }
+  async function nuevos() {
+    if (!actual || document.hidden) return;
+    const pedido = Date.now() - 2000;
+    const r = await api(`/whatsapp/conversaciones/${actual._id}/nuevos?desde=${new Date(desde).toISOString()}`); if (!r.success) return;
+    desde = pedido;
+    const d = r.data;
+    if (d.mensajes.length) { pintarMensajes(d.mensajes); if (d.mensajes.some(m => m.direccion === 'entrante')) api(`/whatsapp/conversaciones/${actual._id}/leida`, 'POST'); }
+    if (d.estado !== actual.estado || d.ventanaAbierta !== actual.ventanaAbierta || String(d.asesor || '') !== String(actual.asesor?._id || '')) abrir(actual._id);
+  }
+
+  // ── Panel del cliente ──
+  let mapaLado;
+  function pintarLado() {
+    const c = actual;
+    $('lado').innerHTML = `<header><h3>Cliente</h3></header><div class="b">
+      <div><b style="font-size:15px">${esc(c.cliente?.nombre || c.nombre || 'Sin nombre')}</b><p style="color:var(--muted);font-size:12.5px;margin-top:4px">${esc(c.telefono)}${c.cliente ? `<br>${esc(c.cliente.documento || '')} · ${fnum(c.cliente.puntos || 0)} puntos` : '<br>No está registrado como cliente'}</p></div>
+      ${c.ubicacion ? `<div class="f"><label>Última ubicación compartida</label><div class="wa-mapa" id="mapaLado"></div><small>${esc(c.ubicacion.direccion || '')}</small></div>` : '<p style="font-size:12.5px;color:var(--muted)">Pide al cliente que comparta su ubicación por WhatsApp para validar la cobertura.</p>'}
+      <button class="btn p" id="nuevoPed" ${R.listo ? '' : 'disabled'}><i class="fa-solid fa-motorcycle"></i> Crear pedido</button>
+      <div><label style="font-size:12px;font-weight:600;color:var(--muted)">Pedidos recientes</label>${c.pedidos.map(p => `<div class="wa-ped"><span><b>${esc(p.numero)}</b><br><span style="color:var(--muted)">${cuando(p.createdAt)} · ${esc(p.estado.replace('_', ' '))}</span></span><b>${dinero(p.total)}</b></div>`).join('') || '<p style="font-size:12.5px;color:var(--faint);margin-top:6px">Sin pedidos</p>'}</div></div>`;
+    if (c.ubicacion && window.L) { mapaLado?.remove(); mapaLado = L.map('mapaLado', { zoomControl: false, attributionControl: false }).setView([c.ubicacion.lat, c.ubicacion.lng], 15); L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19 }).addTo(mapaLado); L.marker([c.ubicacion.lat, c.ubicacion.lng]).addTo(mapaLado); }
+    $('nuevoPed').onclick = crearPedido;
+  }
+
+  // ── Pedido desde el chat ──
+  function crearPedido() {
+    const c = actual, lineas = [];
+    let punto = c.ubicacion ? { lat: c.ubicacion.lat, lng: c.ubicacion.lng } : null, cot = null;
+    const m = modal({ clase: 'l', titulo: `Nuevo pedido · ${esc(c.cliente?.nombre || c.nombre || c.telefono)}`, html: `<div class="grid">
+      <div class="f" style="grid-column:span 12"><label>Agregar producto</label><input class="in" id="bp" placeholder="Busca por nombre, código o PLU"><div id="sug" class="chips" style="margin-top:6px"></div></div>
+      <div style="grid-column:span 12" id="lins"></div>
+      <div class="f"><label>Nombre de quien recibe</label><input class="in" id="nom" value="${esc(c.cliente?.nombre || c.nombre || '')}"></div>
+      <div class="f"><label>Entrega</label><select class="in" id="tipo"><option value="domicilio">Domicilio</option>${R.recoger ? '<option value="recoger">Recoge en la tienda</option>' : ''}</select></div>
+      <div class="f dom" style="grid-column:span 12"><label>Dirección</label><input class="in" id="dir" value="${esc(c.ubicacion?.direccion || '')}" placeholder="Calle, número, barrio"></div>
+      <div class="f dom" style="grid-column:span 12"><label>Detalle y notas para el domiciliario</label><input class="in" id="det" placeholder="Apto, torre, indicaciones"></div>
+      <div class="f dom" style="grid-column:span 12"><label>Punto de entrega ${c.ubicacion ? '(el que compartió el cliente; toca el mapa para moverlo)' : '(toca el mapa)'}</label><div class="wa-mapa-g" id="mapaP"></div><small id="cob"></small></div>
+      <div class="f rec" hidden><label>Sede</label><select class="in" id="sede">${R.sedes.map(s => `<option value="${s._id}">${esc(s.nombre)}</option>`).join('')}</select></div>
+      <div class="f"><label>Medio de pago</label><select class="in" id="mp">${R.medios.map(x => `<option value="${esc(x.codigo)}" data-t="${esc(x.tipo)}">${esc(x.nombre)}</option>`).join('')}</select></div>
+      <div class="f" id="fpc"><label>Paga con (efectivo, opcional)</label><input class="in" id="pc" inputmode="numeric"></div>
+    </div><p class="n" id="tot" style="margin-top:14px;font-size:15px"></p>`, pie: '<button class="btn p" data-s><i class="fa-solid fa-check"></i> Crear pedido y avisar al cliente</button>' });
+    let tb; m.q('#bp').oninput = () => { clearTimeout(tb); tb = setTimeout(async () => { const q = m.q('#bp').value.trim(); if (q.length < 2) { m.q('#sug').innerHTML = ''; return; } const r = await api('/whatsapp/productos?q=' + encodeURIComponent(q)); if (!r.success) return; m.q('#sug').innerHTML = r.data.map((p, i) => `<button class="btn sm" data-i="${i}" ${p.stock != null && p.stock <= 0 ? 'title="Sin existencias"' : ''}>${esc(p.nombre)} · ${dinero(p.precio)}${p.tipo === 'peso' ? '/' + esc(p.unidad) : ''}${p.stock != null && p.stock <= 0 ? ' · agotado' : ''}</button>`).join('') || '<span style="color:var(--faint);font-size:12.5px">Sin resultados (solo productos activos en línea)</span>'; m.q('#sug')._r = r.data; }, 250); };
+    m.q('#sug').onclick = e => { const b = e.target.closest('[data-i]'); if (!b) return; const p = m.q('#sug')._r[b.dataset.i]; const ex = lineas.find(l => l.p._id === p._id); if (ex) ex.cantidad += p.tipo === 'peso' ? 0.5 : 1; else lineas.push({ p, cantidad: p.tipo === 'peso' ? 0.5 : 1 }); m.q('#bp').value = ''; m.q('#sug').innerHTML = ''; m.q('#bp').focus(); pintarLineas(); };
+    function pintarLineas() {
+      m.q('#lins').innerHTML = lineas.length ? lineas.map((l, i) => `<div class="wa-lin"><span>${esc(l.p.nombre)}<br><small style="color:var(--muted)">${dinero(l.p.precio)}${l.p.tipo === 'peso' ? ' / ' + esc(l.p.unidad) + ' (se pesa al alistar)' : ''}</small></span><input class="in" type="number" min="0" step="${l.p.tipo === 'peso' ? '0.05' : '1'}" value="${l.cantidad}" data-q="${i}"><b style="text-align:right">${dinero(Motor.redondear(l.p.precio * l.cantidad, POS.pais.decimales))}</b><button class="ib d" data-x="${i}" aria-label="Quitar"><i class="fa-solid fa-xmark"></i></button></div>`).join('') : '<p style="color:var(--faint);font-size:12.5px">Agrega los productos que pide el cliente.</p>';
+      cotizar();
+    }
+    m.q('#lins').oninput = e => { const i = e.target.dataset.q; if (i != null) { lineas[i].cantidad = Number(e.target.value) || 0; cotizar(); } };
+    m.q('#lins').onclick = e => { const b = e.target.closest('[data-x]'); if (b) { lineas.splice(b.dataset.x, 1); pintarLineas(); } };
+    const total = () => Motor.redondear(lineas.reduce((a, l) => a + l.p.precio * l.cantidad, 0), POS.pais.decimales);
+    const pintarTot = () => {
+      const dom = m.q('#tipo').value === 'domicilio', t = total();
+      m.q('#tot').innerHTML = `Productos ${dinero(t)}${dom && cot?.cubre ? ` · Domicilio ${dinero(cot.tarifa)} <b style="font-size:19px;margin-left:8px">${dinero(t + cot.tarifa)}</b>` : ` <b style="font-size:19px;margin-left:8px">${dinero(t)}</b>`}<br><small style="color:var(--muted)">Valor estimado: al crear el pedido se aplican las promociones vigentes, y los productos por peso se ajustan con el peso real al alistar.</small>`;
+    };
+    let tc;
+    function cotizar() {
+      pintarTot();
+      if (m.q('#tipo').value !== 'domicilio' || !punto) return;
+      clearTimeout(tc);
+      tc = setTimeout(async () => {
+        const r = await api('/whatsapp/cotizar', 'POST', { ...punto, total: total() }); if (!r.success || !m.el.isConnected) return;
+        cot = r.data;
+        m.q('#cob').innerHTML = !cot.cubre ? '<span style="color:var(--danger)">Fuera de la zona de cobertura</span>' : !cot.abierta ? `<span style="color:var(--warning)">La zona está cerrada en este momento${cot.horario ? ` (${esc(cot.horario)})` : ''}</span>` : `Cubre · domicilio ${dinero(cot.tarifa)} · ${cot.minutos} min${cot.pedidoMinimo ? ` · mínimo ${dinero(cot.pedidoMinimo)}` : ''}`;
+        pintarTot();
+      }, 250);
+    }
+    const verTipo = () => { const dom = m.q('#tipo').value === 'domicilio'; m.qq('.dom').forEach(x => { x.hidden = !dom; }); m.qq('.rec').forEach(x => { x.hidden = dom; }); cotizar(); setTimeout(() => mp?.invalidateSize(), 50); };
+    const verMedio = () => { m.q('#fpc').hidden = m.q('#mp').selectedOptions[0]?.dataset.t !== 'efectivo'; };
+    m.q('#tipo').onchange = verTipo; m.q('#mp').onchange = verMedio; verMedio();
+    let mp, marcador;
+    if (window.L) setTimeout(async () => {
+      mp = L.map(m.q('#mapaP')).setView(punto ? [punto.lat, punto.lng] : [4.65, -74.06], punto ? 16 : 12);
+      L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19, attribution: '© OpenStreetMap' }).addTo(mp);
+      const poner = ll => { punto = { lat: ll.lat, lng: ll.lng }; marcador ? marcador.setLatLng(ll) : (marcador = L.marker(ll, { draggable: true }).addTo(mp).on('dragend', e => poner(e.target.getLatLng()))); cotizar(); };
+      if (punto) poner(L.latLng(punto.lat, punto.lng));
+      mp.on('click', e => poner(e.latlng));
+    }, 60);
+    m.q('[data-s]').onclick = async () => {
+      if (!lineas.some(l => l.cantidad > 0)) return toast('Agrega al menos un producto', 'mal');
+      const dom = m.q('#tipo').value === 'domicilio';
+      if (dom && !punto) return toast('Marca el punto de entrega en el mapa', 'mal');
+      const btn = m.q('[data-s]'); btn.disabled = true;
+      const r = await api(`/whatsapp/conversaciones/${c._id}/pedido`, 'POST', { uuid: crypto.randomUUID(), nombre: m.q('#nom').value, tipo: m.q('#tipo').value, sede: dom ? undefined : m.q('#sede').value,
+        items: lineas.filter(l => l.cantidad > 0).map(l => ({ producto: l.p._id, cantidad: l.cantidad })),
+        entrega: dom ? { direccion: m.q('#dir').value, detalle: m.q('#det').value, ...punto } : undefined, medioPago: m.q('#mp').value, pagaCon: Number(m.q('#pc').value) || undefined });
+      btn.disabled = false;
+      if (!r.success) return toast(r.error, 'mal');
+      m.cerrar(); toast(`Pedido ${r.data.numero} creado: el cliente recibe el aviso por WhatsApp`); abrir(c._id);
+    };
+    pintarLineas(); verTipo();
+  }
+
+  // ── Simulador (sin Twilio) ──
+  function simular() {
+    const m = modal({ clase: 's', titulo: 'Simular mensaje de un cliente', html: '<div id="f"></div><p style="font-size:12px;color:var(--muted);margin-top:10px">Solo existe mientras el servidor no tenga credenciales de Twilio. No se envía nada real.</p>', pie: '<button class="btn p" data-s>Enviar como cliente</button>' });
+    const f = formulario(m.q('#f'), [{ k: 'telefono', l: 'Celular del cliente', req: 1, w: 6 }, { k: 'nombre', l: 'Nombre de perfil', w: 6 }, { k: 'texto', l: 'Mensaje', t: 'area', w: 12 }, { k: 'ubicar', l: 'Compartir ubicación (cerca de la primera sede)', t: 'si', w: 12 }], { telefono: actual?.telefono?.replace(/^\+\d{2}/, '') || '3001234567', nombre: 'Cliente de prueba', texto: 'Hola, quiero hacer un pedido' });
+    m.q('[data-s]').onclick = async () => {
+      const o = f.validar(); if (!o) return;
+      const r = await datos('/whatsapp/simular', 'POST', { ...o, ...(o.ubicar && { lat: 4.6520, lng: -74.0628, direccion: 'Ubicación del cliente' }) });
+      if (r) { m.cerrar(); await refrescar(); if (r.conversacion) abrir(r.conversacion); }
+    };
+  }
+
+  pintarCab(); await cargarLista();
+  if (lista[0] && filtro === 'mias') abrir(lista[0]._id);
+  tLista = setInterval(refrescar, 5000);
+})();
+</script>
+</body>
+</html>

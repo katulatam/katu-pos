@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Katú POS</title>
+  <link rel="icon" href="../assets/img/favicon.ico">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Sora:wght@500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+  <link rel="stylesheet" href="pos-admin.css">
+  <style>
+    .pasos { display: flex; flex-direction: column; gap: 10px; }
+    .paso { display: flex; gap: 12px; align-items: flex-start; font-size: 13.5px; line-height: 1.5; }
+    .paso > i { width: 28px; height: 28px; border-radius: 50%; display: grid; place-items: center; flex-shrink: 0; font-size: 12px; background: var(--sutil); color: var(--faint); }
+    .paso.ok > i { background: var(--success-light); color: var(--success); }
+    .paso small { display: block; color: var(--muted); }
+    .cod { font-family: ui-monospace, Consolas, monospace; font-size: 12px; background: var(--sutil); border: 1px solid var(--border); border-radius: 9px; padding: 8px 10px; word-break: break-all; user-select: all; }
+  </style>
+</head>
+<body data-pagina="whatsapp-config">
+<main class="content"></main>
+<script src="../assets/js/motor.js"></script>
+<script src="pos-admin.js"></script>
+<script>
+(async function () {
+  if (!(await POS.listo)) return;
+  const main = document.querySelector('main');
+  const SUP = POS.esSuper, ADM = POS.user.rol === 'admin' || SUP;
+  async function cargar() {
+    const [c, mv] = await Promise.all([datos('/whatsapp/config'), datos('/whatsapp/movimientos')]); if (!c) return;
+    const paso = (ok, t, s) => `<div class="paso ${ok ? 'ok' : ''}"><i class="fa-solid ${ok ? 'fa-check' : 'fa-circle'}"></i><div>${t}${s ? `<small>${s}</small>` : ''}</div></div>`;
+    main.innerHTML = `<div class="head"><div><h1>WhatsApp y mensajes</h1><p>El número de WhatsApp propio de la empresa, los avisos automáticos de pedidos y la bolsa de mensajes.</p></div></div>
+      ${c.simulador ? '<div class="aviso i"><i class="fa-solid fa-flask"></i> Modo simulador: el servidor no tiene credenciales de Twilio, así que no se envía nada real. Sirve para probar la bandeja.</div>' : ''}
+      ${!c.modulo ? '<div class="aviso m"><i class="fa-solid fa-lock"></i> El módulo <b>Domicilios por WhatsApp</b> no está activo para esta empresa. Lo activa el equipo de Katú según la suscripción.</div>' : ''}
+      <div class="kpis">
+        <div class="card"><div class="b"><small style="color:var(--muted)">Estado</small><b style="font-size:20px">${{ sin_configurar: 'Sin configurar', subcuenta: 'Esperando número', activo: 'Activo' }[c.estado]}</b><small style="color:var(--muted)">${esc(c.numero || 'Sin número asignado')}</small></div></div>
+        <div class="card"><div class="b"><small style="color:var(--muted)">Mensajes de WhatsApp disponibles</small><b style="font-size:20px;${c.saldoWhatsapp < 0 ? 'color:var(--danger)' : ''}">${fnum(c.saldoWhatsapp)}</b><small style="color:var(--muted)">Los consumen los avisos con plantilla y las campañas. Responder a un cliente es gratis.</small></div></div>
+        <div class="card"><div class="b"><small style="color:var(--muted)">Correos disponibles</small><b style="font-size:20px">${fnum(c.saldoCorreo)}</b><small style="color:var(--muted)">Para campañas de marketing</small></div></div>
+      </div>
+      <div class="grid" style="align-items:start">
+        <div class="card" style="grid-column:span 6"><header><h3>Avisos y respuesta automática</h3></header><div class="b">
+          <div class="f"><label>Respuesta automática al recibir un mensaje nuevo</label><textarea class="in" id="bv" ${ADM && c.modulo ? '' : 'disabled'} placeholder="Ej: ¡Hola! Gracias por escribir a Minimarket Órbita. Un asesor te atiende en un momento.">${esc(c.bienvenida)}</textarea><small>Se envía cuando el cliente abre una conversación (o la reabre después de cerrada). Con el asistente de IA activo no se usa: el asistente saluda.</small></div>
+          <label style="display:flex;gap:10px;align-items:center;font-size:13.5px"><input type="checkbox" id="np" ${c.notificarPedidos ? 'checked' : ''} ${ADM && c.modulo ? '' : 'disabled'}> Avisar por WhatsApp cada cambio de los pedidos de domicilio (recibido, en camino con PIN, entregado, cancelado)</label>
+          <small style="color:var(--muted);font-size:12px;line-height:1.5">Si el cliente escribió en las últimas 24 horas, el aviso va como mensaje normal (gratis). Si no, solo se puede enviar con una plantilla aprobada por Meta y consume 1 mensaje de la bolsa.</small>
+          <div class="sec" style="margin-top:6px"><i class="fa-solid fa-robot" style="color:var(--violeta)"></i> Asistente de IA</div>
+          ${c.iaDisponible ? '' : '<div class="aviso m"><i class="fa-solid fa-triangle-exclamation"></i> El servidor no tiene configurada la IA (OPENROUTER_API_KEY).</div>'}
+          <label style="display:flex;gap:10px;align-items:center;font-size:13.5px"><input type="checkbox" id="ba" ${c.bot.activo ? 'checked' : ''} ${ADM && c.modulo && c.iaDisponible ? '' : 'disabled'}> El asistente atiende primero: busca productos, arma el pedido, cotiza el domicilio y lo confirma. Pasa a un asesor ante quejas, problemas o cuando el cliente lo pide.</label>
+          <div class="f"><label>Indicaciones para el asistente (opcional)</label><textarea class="in" id="bi" ${ADM && c.modulo ? '' : 'disabled'} placeholder="Ej: Atendemos de 7 a. m. a 9 p. m. Los domingos no hay domicilios. Trata a los clientes de usted.">${esc(c.bot.instrucciones)}</textarea><small>Modelo: ${esc(c.modeloIA)}. El asistente nunca da descuentos ni inventa precios: todo sale del catálogo.</small></div>
+          ${ADM && c.modulo ? '<button class="btn p" id="gc" style="align-self:flex-start">Guardar</button>' : ''}
+        </div></div>
+        <div class="card" style="grid-column:span 6"><header><h3>Movimientos de la bolsa</h3></header><div id="mv"></div></div>
+        ${SUP ? `<div class="card" style="grid-column:span 12"><header><h3><i class="fa-solid fa-bolt" style="color:var(--primary)"></i> Alta del número (equipo Katú)</h3></header><div class="b">
+          <div class="pasos">
+            ${paso(c.servidorListo && !c.simulador, 'Credenciales maestras de Twilio en el servidor', c.servidorListo && !c.simulador ? 'TWILIO_ACCOUNT_SID y TWILIO_AUTH_TOKEN configurados' : 'Agrega TWILIO_ACCOUNT_SID y TWILIO_AUTH_TOKEN al .env (mientras tanto funciona el simulador)')}
+            ${paso(c.subcuenta, 'Subcuenta y servicio de mensajería de la empresa', c.subcuenta ? `Servicio ${esc(c.servicioSid)}` : 'Crea la subcuenta: queda con los webhooks de Katú ya apuntados')}
+            ${paso(c.estado === 'activo', 'Remitente de WhatsApp aprobado por Meta', 'En la consola de Twilio, dentro de la subcuenta: registra el número como remitente de WhatsApp (WhatsApp Business de la empresa) y agrégalo al servicio de mensajería. Luego escribe el número aquí.')}
+          </div>
+          ${c.subcuenta ? '' : `<button class="btn p" id="sc" style="align-self:flex-start" ${c.servidorListo ? '' : 'disabled'}><i class="fa-solid fa-plus"></i> Crear subcuenta</button>`}
+          <div class="f"><label>Webhooks (ya quedan configurados en el servicio)</label><div class="cod">Entrantes: ${esc(c.webhooks.entrante)}<br>Estados: ${esc(c.webhooks.estado)}</div></div>
+          ${c.subcuenta ? `<div class="grid"><div class="f"><label>Número de WhatsApp de la empresa</label><input class="in" id="num" value="${esc(c.numero)}" placeholder="3001234567 o +573001234567"></div><div class="f" style="justify-content:flex-end"><button class="btn p" id="gn">Verificar y activar</button></div></div>
+          <div class="sec">Plantillas aprobadas por Meta (Content SID, empieza por HX)</div>
+          <p style="font-size:12.5px;color:var(--muted)">Variables: {{1}} nombre del cliente, {{2}} número de pedido, {{3}} enlace de seguimiento. Sin plantilla, ese aviso solo se envía si el cliente escribió en las últimas 24 horas.</p>
+          <div class="grid">${[['recibido', 'Pedido recibido'], ['en_camino', 'En camino'], ['listo', 'Listo para recoger'], ['entregado', 'Entregado'], ['cancelado', 'Cancelado']].map(([k, t]) => `<div class="f"><label>${t}</label><input class="in" data-pl="${k}" value="${esc(c.plantillas[k] || '')}" placeholder="HX…"></div>`).join('')}</div>
+          <button class="btn" id="gp" style="align-self:flex-start">Guardar plantillas</button>` : ''}
+          <div class="sec">Recargar bolsa</div>
+          <div class="grid"><div class="f" style="grid-column:span 3"><label>Mensajes de WhatsApp</label><input class="in" id="rw" type="number" step="1" placeholder="0"></div><div class="f" style="grid-column:span 3"><label>Correos</label><input class="in" id="rc" type="number" step="1" placeholder="0"></div><div class="f" style="grid-column:span 4"><label>Motivo</label><input class="in" id="rm" placeholder="Paquete comprado, factura…"></div><div class="f" style="grid-column:span 2;justify-content:flex-end"><button class="btn p" id="rr">Recargar</button></div></div>
+          <small style="color:var(--faint)">Un valor negativo descuenta (ajuste).</small>
+        </div></div>` : ''}
+      </div>`;
+    tabla($('mv'), [{ t: 'Fecha', f: x => fecha(x.createdAt) }, { t: 'Canal', f: x => x.canal === 'correo' ? 'Correo' : 'WhatsApp' }, { t: 'Movimiento', f: x => `${{ recarga: 'Recarga', consumo: 'Consumo', ajuste: 'Ajuste' }[x.tipo]}<small>${esc(x.motivo || '')}${x.referencia ? ' · ' + esc(x.referencia) : ''}${x.usuario ? ' · ' + esc(x.usuario.nombre) : ''}</small>` }, { t: 'Cantidad', n: 1, f: x => `<b style="color:${x.cantidad < 0 ? 'var(--danger)' : 'var(--success)'}">${x.cantidad > 0 ? '+' : ''}${fnum(x.cantidad)}</b>` }, { t: 'Saldo', n: 1, f: x => fnum(x.saldo) }], mv || [], { vacio: 'Sin movimientos', icono: 'fa-coins' });
+    $('gc') && ($('gc').onclick = async () => { if (await datos('/whatsapp/config', 'PUT', { bienvenida: $('bv').value, notificarPedidos: $('np').checked, bot: { activo: $('ba').checked, instrucciones: $('bi').value } })) toast('Guardado'); });
+    $('sc') && ($('sc').onclick = async () => { if (await datos('/whatsapp/subcuenta', 'POST')) { toast('Subcuenta creada'); cargar(); } });
+    $('gn') && ($('gn').onclick = async () => { if (await datos('/whatsapp/numero', 'PUT', { numero: $('num').value })) { toast('Número verificado y activo'); cargar(); } });
+    $('gp') && ($('gp').onclick = async () => { const plantillas = Object.fromEntries([...document.querySelectorAll('[data-pl]')].map(i => [i.dataset.pl, i.value.trim()])); if (await datos('/whatsapp/numero', 'PUT', { plantillas })) toast('Plantillas guardadas'); });
+    $('rr') && ($('rr').onclick = async () => { if (await datos('/whatsapp/bolsa', 'POST', { whatsapp: Number($('rw').value) || 0, correo: Number($('rc').value) || 0, motivo: $('rm').value })) { toast('Bolsa actualizada'); cargar(); } });
+  }
+  cargar();
+})();
+</script>
+</body>
+</html>

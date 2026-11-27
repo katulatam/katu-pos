@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Katú POS</title>
+  <link rel="icon" href="../assets/img/favicon.ico">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Sora:wght@500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+  <link rel="stylesheet" href="pos-admin.css">
+</head>
+<body data-pagina="inventario">
+<main class="content"></main>
+<script src="../assets/js/motor.js"></script>
+<script src="pos-admin.js"></script>
+<script>
+(async function () {
+  if (!(await POS.listo)) return;
+
+  const sedes = await datos('/sedes') || []; const edita = POS.esSuper || ['admin', 'bodega'].includes(POS.user.rol);
+  document.querySelector('main').innerHTML = `<div class="head"><div><h1>Existencias</h1><p id="res"></p></div><div class="acts">${edita ? '<button class="btn" id="tr"><i class="fa-solid fa-right-left"></i> Trasladar</button><button class="btn p" id="aj"><i class="fa-solid fa-scale-balanced"></i> Ajustar</button>' : ''}</div></div><div class="filtros"><div class="f g"><input class="in" id="q" placeholder="Buscar producto"></div><div class="f"><select class="in" id="sd"><option value="">Todas las sedes</option>${sedes.map(s => `<option value="${s._id}">${esc(s.nombre)}</option>`).join('')}</select></div><label class="sw"><input type="checkbox" id="bj" ${new URLSearchParams(location.search).get('bajo') ? 'checked' : ''}> Solo en el mínimo</label></div><div class="card" id="t"></div>`;
+  let l = [];
+  async function cargar() { l = await datos('/inventario?sede=' + $('sd').value) || []; pintar(); }
+  function pintar() { const q = $('q').value.toLowerCase(); const v = l.filter(p => (!q || `${p.nombre} ${p.codigo} ${p.plu}`.toLowerCase().includes(q)) && (!$('bj').checked || p.bajo)); $('res').textContent = `${fnum(v.length)} productos · valor a costo ${dinero(v.reduce((a, p) => a + p.valor, 0))}`; tabla($('t'), [{ t: 'Producto', f: p => `<b>${esc(p.nombre)}</b><small>${esc(p.codigo || p.plu)}</small>` }, { t: 'Existencia', n: 1, f: p => `<span class="bd ${p.cantidad <= 0 ? 'mal' : p.bajo ? 'av' : 'ok'}">${fnum(p.cantidad)} ${p.unidad === 'und' ? '' : p.unidad}</span>` }, { t: 'Reservado', n: 1, f: p => p.reservado ? fnum(p.reservado) : '—' }, { t: 'Disponible', n: 1, f: p => fnum(p.disponible) }, { t: 'Mínimo', n: 1, f: p => fnum(p.minimo) }, { t: 'Costo', n: 1, f: p => dinero(p.costo) }, { t: 'Valor', n: 1, f: p => dinero(p.valor) }], v, { vacio: 'Sin productos', icono: 'fa-warehouse', clic: kardex }); }
+  async function kardex(p) { const d = await datos(`/inventario/kardex/${p._id}?sede=${$('sd').value}`); if (!d) return; const m = modal({ clase: 'l', titulo: `Movimientos de ${esc(p.nombre)}`, html: '<div class="card" id="k"></div>' }); tabla(m.q('#k'), [{ t: 'Fecha', f: x => fecha(x.createdAt) }, { t: 'Movimiento', f: x => `<b>${{ venta: 'Venta', compra: 'Compra', ajuste: 'Ajuste', merma: 'Merma', traslado: 'Traslado', devolucion: 'Devolución', inicial: 'Inicial' }[x.tipo]}</b><small>${esc([x.referencia, x.motivo, x.usuario?.nombre].filter(Boolean).join(' · '))}</small>` }, { t: 'Sede', f: x => esc(x.sede?.nombre) }, { t: 'Cantidad', n: 1, f: x => `<span class="${x.cantidad > 0 ? 'sube' : 'baja'}">${x.cantidad > 0 ? '+' : ''}${fnum(x.cantidad)}</span>` }, { t: 'Saldo', n: 1, f: x => fnum(x.saldo) }], d, { vacio: 'Sin movimientos' }); }
+  $('sd').onchange = cargar; $('q').oninput = pintar; $('bj').onchange = pintar;
+  if (edita) {
+    $('aj').onclick = () => { let prod = null; const m = modal({ titulo: 'Ajustar inventario', html: '<div class="f" style="margin-bottom:14px"><label>Producto</label><input class="in" id="pb" placeholder="Busca o escanea"></div><div id="f"></div>', pie: '<button class="btn p" data-s>Guardar ajuste</button>' }); const f = formulario(m.q('#f'), [{ k: 'sede', l: 'Sede', t: 'lista', op: sedes.map(s => [s._id, s.nombre]) }, { k: 'tipo', l: 'Tipo', t: 'lista', op: [['conteo', 'Conteo físico (dejar en)'], ['ajuste', 'Sumar o restar'], ['merma', 'Merma o daño'], ['inicial', 'Inventario inicial']] }, { k: 'cantidad', l: 'Cantidad', t: 'numero', req: 1 }, { k: 'motivo', l: 'Motivo', req: 1 }]); buscarProducto(m.q('#pb'), p => { prod = p; m.q('#pb').value = p.nombre; }); m.q('[data-s]').onclick = async () => { const o = f.validar(); if (!o) return; if (!prod) return toast('Elige el producto', 'mal'); const r = await datos('/inventario/ajuste', 'POST', { producto: prod._id, sede: o.sede, motivo: o.motivo, tipo: o.tipo === 'conteo' ? 'ajuste' : o.tipo, ...(o.tipo === 'conteo' ? { contado: o.cantidad } : { cantidad: o.cantidad }) }); if (r) { m.cerrar(); toast('Nuevo saldo: ' + fnum(r.saldo)); cargar(); } }; };
+    $('tr').onclick = () => { if (sedes.length < 2) return toast('Necesitas al menos dos sedes', 'mal'); const it = []; const m = modal({ titulo: 'Trasladar entre sedes', html: '<div id="f"></div><div class="f" style="margin:14px 0"><label>Agregar producto</label><input class="in" id="pb" placeholder="Busca o escanea"></div><div id="ls"></div>', pie: '<button class="btn p" data-s>Trasladar</button>' }); const f = formulario(m.q('#f'), [{ k: 'origen', l: 'Sale de', t: 'lista', op: sedes.map(s => [s._id, s.nombre]) }, { k: 'destino', l: 'Llega a', t: 'lista', op: sedes.map(s => [s._id, s.nombre]), def: sedes[1]._id }]); const ver = () => { m.q('#ls').innerHTML = it.map((x, i) => `<div class="lin" style="grid-template-columns:2fr .8fr auto"><input class="in" disabled value="${esc(x.nombre)}"><input class="in" type="number" step="any" data-i="${i}" value="${x.cantidad}"><button class="ib d" data-q="${i}"><i class="fa-solid fa-trash"></i></button></div>`).join(''); }; buscarProducto(m.q('#pb'), p => { it.push({ producto: p._id, nombre: p.nombre, cantidad: 1 }); ver(); }); m.q('#ls').oninput = e => { if (e.target.dataset.i) it[e.target.dataset.i].cantidad = Number(e.target.value); }; m.q('#ls').onclick = e => { const q = e.target.closest('[data-q]'); if (q) { it.splice(Number(q.dataset.q), 1); ver(); } }; m.q('[data-s]').onclick = async () => { const r = await datos('/inventario/traslado', 'POST', { ...f.tomar(), items: it }); if (r) { m.cerrar(); toast('Traslado registrado'); cargar(); } }; };
+  }
+  cargar();
+})();
+</script>
+</body>
+</html>

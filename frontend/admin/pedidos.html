@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Katú POS</title>
+  <link rel="icon" href="../assets/img/favicon.ico">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Sora:wght@500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
+  <link rel="stylesheet" href="pos-admin.css">
+</head>
+<body data-pagina="pedidos">
+<main class="content"></main>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+<script src="../assets/js/motor.js"></script>
+<script src="pos-admin.js"></script>
+<script>
+(async function () {
+  if (!(await POS.listo)) return;
+
+  const EST = [['recibido', 'Nuevos'], ['preparando', 'Preparando'], ['listo', 'Listos'], ['en_camino', 'En camino']];
+  document.querySelector('main').innerHTML = `<div class="head"><div><h1>Tablero de pedidos</h1><p id="res"></p></div><div class="acts"><button class="btn" id="hist"><i class="fa-solid fa-clock-rotate-left"></i> Historial</button></div></div><div class="kan" id="k"></div><div class="card"><header><h3>Domiciliarios en ruta</h3></header><div class="b"><div class="mapa" id="mapa"></div></div></div>`;
+  let mapa, capas = [], D = null, vistos = null;
+  const desde = d => { const m = Math.round((Date.now() - new Date(d)) / 60000); return m < 60 ? `${m} min` : `${Math.floor(m / 60)} h ${m % 60} min`; };
+  async function cargar() {
+    const d = await datos('/pedidos/tablero'); if (!d) return; D = d;
+    const ent = d.hoy.find(x => x._id === 'entregado'); $('res').textContent = `Hoy: ${ent?.n || 0} entregados · ${dinero(ent?.total || 0)}`;
+    if (vistos && d.pedidos.some(p => !vistos.has(p._id))) toast('Llegó un pedido nuevo'); vistos = new Set(d.pedidos.map(p => p._id));
+    $('k').innerHTML = EST.map(([e, t]) => { const l = d.pedidos.filter(p => p.estado === e); return `<section><h3>${t}<span class="bd">${l.length}</span></h3>${l.map(p => `<button class="ped" data-p="${p._id}"><div class="t"><span>${esc(p.numero)}</span><b>${dinero(p.total)}</b></div><p>${esc(p.contacto.nombre)}<br>${esc(p.tipo === 'recoger' ? 'Recoge en ' + p.sede?.nombre : p.entrega.direccion)}</p><div class="p"><span class="bd">${desde(p.createdAt)}</span><span class="bd">${p.items.length} productos</span>${p.tipoPago === 'qr' ? `<span class="bd ${p.pagado ? 'ok' : 'av'}">${p.pagado ? 'Pagado' : 'Sin pagar'}</span>` : ''}${p.porPesar ? '<span class="bd vi">Por pesar</span>' : ''}${p.domiciliario ? `<span class="bd az">${esc(p.domiciliario.nombre)}</span>` : ''}</div></button>`).join('') || '<div class="nada" style="padding:24px">Sin pedidos</div>'}</section>`; }).join('');
+    if (window.L) { if (!mapa) { mapa = L.map('mapa').setView([0, 0], 2); L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19, attribution: '© OpenStreetMap' }).addTo(mapa); } capas.forEach(c => c.remove()); capas = []; const pts = [];
+      d.domiciliarios.filter(x => x.ubicacion?.lat).forEach(x => { pts.push([x.ubicacion.lat, x.ubicacion.lng]); capas.push(L.circleMarker([x.ubicacion.lat, x.ubicacion.lng], { radius: 10, color: '#fff', weight: 2, fillColor: '#5A49E0', fillOpacity: 1 }).bindTooltip(`${esc(x.nombre)} · ${x.enRuta} pedidos`).addTo(mapa)); });
+      d.pedidos.filter(p => p.entrega?.lat).forEach(p => { pts.push([p.entrega.lat, p.entrega.lng]); capas.push(L.circleMarker([p.entrega.lat, p.entrega.lng], { radius: 7, color: '#fff', weight: 2, fillColor: '#0497AC', fillOpacity: 1 }).bindTooltip(esc(p.numero)).addTo(mapa)); });
+      if (pts.length && !mapa._v) { mapa.fitBounds(pts, { padding: [40, 40], maxZoom: 15 }); mapa._v = 1; } }
+  }
+  $('k').onclick = e => { const b = e.target.closest('[data-p]'); if (b) abrir(D.pedidos.find(p => p._id === b.dataset.p)); };
+  function abrir(p) {
+    const edit = ['recibido', 'preparando'].includes(p.estado) && !p.pagado;
+    const sig = { recibido: ['preparando', 'Empezar a preparar'], preparando: ['listo', 'Marcar listo'], listo: p.tipo === 'recoger' ? ['entregado', 'Entregar'] : ['en_camino', 'Despachar'] }[p.estado];
+    const m = modal({ clase: 'l', titulo: `${esc(p.numero)} · ${esc(p.contacto.nombre)}`, html: `<p style="color:var(--muted);line-height:1.7;margin-bottom:12px">${esc(p.contacto.telefono)}${p.entrega ? ` · ${esc([p.entrega.direccion, p.entrega.detalle].filter(Boolean).join(', '))} (${fnum(p.entrega.distanciaM / 1000, 1)} km)` : ''}${p.entrega?.notas ? `<br>${esc(p.entrega.notas)}` : ''}</p><div class="card" id="it"></div>${p.estado === 'listo' && p.tipo !== 'recoger' ? `<div class="f" style="margin-top:14px"><label>Domiciliario</label><select class="in" id="dm">${D.domiciliarios.map(d => `<option value="${d._id}" ${d._id === p.domiciliario?._id ? 'selected' : ''}>${esc(d.nombre)}${d.enRuta ? ` — ${d.enRuta} en ruta` : d.disponible ? '' : ' — no disponible'}</option>`).join('')}</select></div>` : ''}<p class="n" style="margin-top:14px">Productos ${dinero(p.totalProductos)} · Domicilio ${dinero(p.domicilio)} <b style="font-size:20px;margin-left:10px">${dinero(p.total)}</b></p>`, pie: `<button class="btn d" data-c style="margin-right:auto">Cancelar pedido</button>${edit ? '<button class="btn" data-a>Guardar cantidades</button>' : ''}${sig ? `<button class="btn p" data-s>${sig[1]}</button>` : ''}` });
+    tabla(m.q('#it'), [{ t: 'Producto', f: i => `${esc(i.nombre)}${i.nota ? `<small>${esc(i.nota)}</small>` : ''}` }, { t: 'Pidió', n: 1, f: i => `${fnum(i.cantidad)} ${i.porPeso ? i.unidad : ''}` }, { t: 'Alistado', n: 1, f: i => edit ? `<input class="in" type="number" step="any" min="0" style="width:110px" data-it="${i._id}" value="${i.cantidadReal ?? (i.porPeso ? '' : i.cantidad)}">` : fnum(i.cantidadReal ?? i.cantidad) }, { t: 'Total', n: 1, f: i => dinero(i.total) }], p.items);
+    const items = () => m.qq('[data-it]').filter(i => i.value !== '').map(i => ({ item: i.dataset.it, cantidad: Number(i.value) }));
+    m.q('[data-a]')?.addEventListener('click', async () => { if (await datos(`/pedidos/${p._id}/alistar`, 'PUT', { items: items() })) { m.cerrar(); toast('Guardado'); cargar(); } });
+    m.q('[data-s]')?.addEventListener('click', async () => { if (edit && items().length && !(await datos(`/pedidos/${p._id}/alistar`, 'PUT', { items: items() }))) return; if (await datos(`/pedidos/${p._id}/estado`, 'PUT', { estado: sig[0], domiciliario: m.q('#dm')?.value })) { m.cerrar(); cargar(); } });
+    m.q('[data-c]').onclick = () => { const x = modal({ clase: 's', titulo: 'Cancelar pedido', html: `${p.pagado ? '<div class="aviso m" style="margin-bottom:12px">El cliente ya pagó: devuelve el dinero por la pasarela.</div>' : ''}<div id="f"></div>`, pie: '<button class="btn p" data-s>Cancelar pedido</button>' }); const f = formulario(x.q('#f'), [{ k: 'motivo', l: 'Motivo', w: 12, req: 1 }]); x.q('[data-s]').onclick = async () => { const o = f.validar(); if (o && await datos(`/pedidos/${p._id}/estado`, 'PUT', { estado: 'cancelado', ...o })) { x.cerrar(); m.cerrar(); cargar(); } }; };
+  }
+  $('hist').onclick = async () => { const m = modal({ clase: 'l', titulo: 'Historial de pedidos', html: '<div class="filtros" id="rg" style="margin-bottom:14px"></div><div class="card" id="t"></div>' }); const rg = rango(m.q('#rg'), () => ir(), 6); const ir = async () => { const d = await datos('/pedidos?' + rg()); if (d) tabla(m.q('#t'), [{ t: 'Pedido', f: p => `<b>${esc(p.numero)}</b><small>${fecha(p.createdAt)}</small>` }, { t: 'Cliente', f: p => esc(p.contacto.nombre) }, { t: 'Domiciliario', f: p => esc(p.domiciliario?.nombre || '—') }, { t: 'Estado', f: p => `<span class="bd ${p.estado === 'entregado' ? 'ok' : p.estado === 'cancelado' ? 'mal' : 'az'}">${p.estado.replace('_', ' ')}</span>${p.motivoCancelacion ? `<small>${esc(p.motivoCancelacion)}</small>` : ''}` }, { t: 'Nota', f: p => p.calificacion?.estrellas ? '★'.repeat(p.calificacion.estrellas) : '' }, { t: 'Total', n: 1, f: p => dinero(p.total) }], d); }; ir(); };
+  cargar(); setInterval(cargar, 10000);
+})();
+</script>
+</body>
+</html>

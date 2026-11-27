@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <title>Katú</title>
+  <link rel="icon" href="/assets/img/favicon.ico">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Sora:wght@600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
+  <link rel="stylesheet" href="/tienda/tienda.css">
+</head>
+<body>
+<header class="cab"><div><a class="pill" id="vo" aria-label="Volver"><i class="fa-solid fa-arrow-left"></i></a><div class="sp"><h1>Mi cuenta</h1></div><button class="pill" id="sa" hidden>Salir</button></div></header><main id="m" style="max-width:720px"></main>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+<script src="/assets/js/motor.js"></script><script src="/tienda/tienda.js"></script>
+<script>
+(async function () {
+  const d = await cargar(); if (!d) return; $('vo').href = '/t/' + slug;
+  let c = null; if (token()) { const r = await api('/tienda/cuenta/yo'); if (r.success) c = r.data; else localStorage.removeItem('katu_cli_token'); }
+  if (!c) { c = await ingresar(d.pais.codigo); if (!c) return location.replace('/t/' + slug); }
+  $('sa').hidden = false; $('sa').onclick = () => { localStorage.removeItem('katu_cli_token'); location.replace('/t/' + slug); };
+  async function pintar() {
+    const [j, p, q] = await Promise.all([d.empresa.gamificacion ? api(`/tienda/t/${slug}/juego`) : { data: null }, api('/tienda/cuenta/pedidos'), api('/tienda/cuenta/qr')]); const g = j.data;
+    $('m').innerHTML = `${g ? `<section class="nivel" style="--n:${esc(g.nivel.actual.color)}"><p style="opacity:.75;font-weight:600">${esc(c.nombre)} · nivel ${esc(g.nivel.actual.nombre)}</p><div class="pts" style="margin:12px 0 4px">${g.puntos.toLocaleString(d.pais.locale)}</div><p style="opacity:.75">puntos, valen ${dinero(g.valorPuntos)}</p><div class="pb" style="margin-top:18px"><i style="width:${g.nivel.avance}%"></i></div><p style="opacity:.75;font-size:13.5px;margin-top:8px">${g.nivel.siguiente ? `Te faltan ${g.nivel.faltan.toLocaleString(d.pais.locale)} para ${esc(g.nivel.siguiente.nombre)}` : 'Estás en el nivel máximo'}${g.racha?.semanas > 1 ? ` · racha de ${g.racha.semanas} semanas` : ''}</p></section>${g.giros.length ? `<section class="caja" style="text-align:center"><h3 style="justify-content:center"><i class="fa-solid fa-dharmachakra"></i>Tienes ${g.giros.length} ${g.giros.length === 1 ? 'giro' : 'giros'} en la ruleta</h3><button class="bt" id="gi">Girar</button></section>` : ''}${g.misiones.length ? `<section class="caja"><h3><i class="fa-solid fa-bolt"></i>Misiones</h3>${g.misiones.map(m => `<div class="ln"><i class="fa-solid ${esc(m.icono)}" style="color:${m.completada ? 'var(--v)' : 'var(--c)'};width:24px"></i><span class="d"><b>${esc(m.nombre)}</b><small>${esc(m.descripcion)}</small><div class="pb"><i style="width:${Math.round(m.avance * 100 / m.meta)}%"></i></div></span><b>${m.completada ? 'Lista' : '+' + m.premioPuntos}</b></div>`).join('')}</section>` : ''}${g.recompensas.length ? `<section class="caja"><h3><i class="fa-solid fa-gift"></i>Recompensas en caja</h3>${g.recompensas.map(r => `<div class="ln"><i class="fa-solid ${esc(r.icono)}" style="color:var(--c);width:24px"></i><span class="d"><b>${esc(r.nombre)}</b><small>−${dinero(r.descuento)}${r.nivelMinimo ? ` · desde nivel ${esc(r.nivelMinimo)}` : ''}</small></span><b style="color:${g.puntos >= r.puntos ? 'var(--v)' : 'var(--t3)'}">${r.puntos} pts</b></div>`).join('')}</section>` : ''}${g.insignias.length ? `<section class="caja"><h3><i class="fa-solid fa-medal"></i>Insignias</h3><div class="chs">${g.insignias.map(i => `<span class="ch"><i class="fa-solid ${esc(i.icono)}"></i> ${esc(i.nombre)}</span>`).join('')}</div></section>` : ''}` : ''}
+    <section class="caja" style="text-align:center"><h3 style="justify-content:center"><i class="fa-solid fa-qrcode"></i>Muéstralo en la caja</h3>${q.success ? `<img src="${esc(q.data.qr)}" alt="Tu código" style="width:190px">` : ''}<p style="font-weight:700;letter-spacing:1px">${esc(c.codigo)}</p></section>
+    <section class="caja"><h3><i class="fa-solid fa-receipt"></i>Mis pedidos</h3>${(p.data || []).map(x => `<a class="ln" style="text-decoration:none;color:inherit" href="/seguimiento/${x.seguimiento}"><span class="d"><b>${esc(x.empresa?.nombre || '')}</b><small>${esc(x.numero)} · ${new Date(x.createdAt).toLocaleDateString(d.pais.locale)} · ${x.estado.replace('_', ' ')}</small></span><b>${Motor.dinero(x.total, { ...d.pais, moneda: x.moneda, decimales: x.decimales })}</b></a>`).join('') || '<p style="color:var(--t2)">Todavía no has hecho pedidos.</p>'}</section>`;
+    if ($('gi')) $('gi').onclick = () => ruleta(g);
+  }
+  function ruleta(g) {
+    const ps = g.ruleta.premios, n = ps.length, a = 2 * Math.PI / n, w = ventana('Ruleta', '<div class="rul"><canvas width="600" height="600"></canvas></div><h2 style="text-align:center;min-height:30px" id="rz"></h2><button class="bt" id="go">Girar</button>'), cv = w.q('canvas'), x = cv.getContext('2d');
+    ps.forEach((p, i) => { x.beginPath(); x.moveTo(300, 300); x.arc(300, 300, 290, i * a - Math.PI / 2, (i + 1) * a - Math.PI / 2); x.fillStyle = p.color; x.fill(); x.save(); x.translate(300, 300); x.rotate((i + .5) * a - Math.PI / 2); x.fillStyle = '#fff'; x.font = '700 30px Sora'; x.textAlign = 'right'; x.textBaseline = 'middle'; x.fillText(p.nombre, 272, 0); x.restore(); });
+    w.q('#go').onclick = async e => { e.target.disabled = true; const r = await api(`/tienda/t/${slug}/girar/${g.giros[0]._id}`, 'POST', {}); if (!r.success) { toast(r.error); return w.cerrar(); } cv.style.transform = `rotate(${360 * 7 - (r.data.indice + .5) * 360 / n}deg)`; setTimeout(() => { w.q('#rz').textContent = r.data.puntos ? `¡Ganaste ${r.data.premio}!` : r.data.premio; e.target.disabled = false; e.target.textContent = 'Cerrar'; e.target.onclick = () => { w.cerrar(); pintar(); }; }, 4300); };
+  }
+  pintar();
+})();
+</script>
+</body>
+</html>

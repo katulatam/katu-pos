@@ -1,0 +1,26 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Katú POS</title>
+  <link rel="icon" href="../assets/img/favicon.ico">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Sora:wght@500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+  <link rel="stylesheet" href="pos-admin.css">
+</head>
+<body data-pagina="recompensas">
+<main class="content"></main>
+<script src="../assets/js/motor.js"></script>
+<script src="pos-admin.js"></script>
+<script>
+(async function () {
+  if (!(await POS.listo)) return;
+
+  crud({ ruta: '/recompensas', titulo: 'Recompensas', sub: 'Descuentos que el cliente canjea con sus puntos en la caja.', nuevo: 'Nueva recompensa', icono: 'fa-gift',
+    columnas: [{ t: 'Recompensa', f: r => `<b><i class="fa-solid ${esc(r.icono)}" style="color:var(--violeta);width:24px"></i>${esc(r.nombre)}</b><small>${esc(r.descripcion)}</small>` }, { t: 'Puntos', n: 1, f: r => fnum(r.puntos) }, { t: 'Descuenta', n: 1, f: r => dinero(r.descuento) }, { t: 'Nivel', f: r => esc(r.nivelMinimo || 'Todos') }, { t: 'Estado', f: r => si(r.activo, 'Activa', 'Inactiva') }],
+    campos: [{ k: 'nombre', l: 'Nombre', req: 1 }, { k: 'icono', l: 'Ícono', t: 'lista', op: ['fa-gift', 'fa-tag', 'fa-rocket', 'fa-star', 'fa-mug-hot', 'fa-cookie-bite', 'fa-gem'].map(i => [i, i.slice(3)]) }, { k: 'descripcion', l: 'Descripción', w: 12 }, { k: 'puntos', l: 'Cuesta (puntos)', t: 'numero', req: 1 }, { k: 'descuento', l: 'Descuento', t: 'dinero', req: 1 }, { k: 'nivelMinimo', l: 'Nivel mínimo', t: 'lista', vacio: 'Todos', op: (POS.empresa.gamificacion.niveles || []).map(n => n.nombre) }, { k: 'activo', l: 'Activa', t: 'si', def: true }] }).cargar();
+})();
+</script>
+</body>
+</html>

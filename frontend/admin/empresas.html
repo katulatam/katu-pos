@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Katú POS</title>
+  <link rel="icon" href="../assets/img/favicon.ico">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Sora:wght@500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+  <link rel="stylesheet" href="pos-admin.css">
+</head>
+<body data-pagina="empresas">
+<main class="content"></main>
+<script src="../assets/js/motor.js"></script>
+<script src="pos-admin.js"></script>
+<script>
+(async function () {
+  if (!(await POS.listo)) return;
+
+  const ps = (await datos('/paises'))?.paises || []; const MD = { facturacion: 'Facturación electrónica', domicilios: 'Domicilios', gamificacion: 'Gamificación', fiado: 'Fiado', kiosco: 'Kiosco (autopago)', whatsapp: 'Domicilios por WhatsApp', marketing: 'Marketing' };
+  document.querySelector('main').innerHTML = `<div class="head"><div><h1>Empresas</h1><p>Los clientes de Katú, por país.</p></div><div class="acts"><button class="btn p" id="nv"><i class="fa-solid fa-plus"></i> Nueva empresa</button></div></div><div class="filtros"><div class="f g"><input class="in" id="q" placeholder="Buscar"></div><div class="f"><select class="in" id="pa"><option value="">Todos los países</option>${ps.map(p => `<option value="${p.codigo}">${esc(p.nombre)}</option>`).join('')}</select></div></div><div id="l"></div>`;
+  let l = [];
+  async function cargar() { l = await datos('/empresas') || []; pintar(); }
+  function pintar() { const q = $('q').value.toLowerCase(), f = l.filter(e => (!$('pa').value || e.pais === $('pa').value) && (!q || `${e.nombre} ${e.slug} ${e.idFiscal}`.toLowerCase().includes(q))); const g = [...new Set(f.map(e => e.pais))]; $('l').innerHTML = g.map(p => `<div class="card" style="margin-bottom:18px"><header><h3>${esc(ps.find(x => x.codigo === p)?.nombre || p)}</h3><p>${esc(ps.find(x => x.codigo === p)?.moneda || '')}</p></header><div data-g="${p}"></div></div>`).join('') || '<div class="card"><div class="nada">No hay empresas</div></div>';
+    g.forEach(p => { const pa = ps.find(x => x.codigo === p); tabla(document.querySelector(`[data-g="${p}"]`), [{ t: 'Empresa', f: e => `<b>${esc(e.nombre)}</b><small>/t/${esc(e.slug)} · ${esc(e.idFiscal)}</small>` }, { t: 'Zona horaria', f: e => esc(e.zonaHoraria) }, { t: 'Módulos', f: e => Object.keys(MD).filter(k => e.modulos?.[k]).map(k => `<span class="bd">${MD[k]}</span>`).join(' ') }, { t: 'Ventas 30 días', n: 1, f: e => `${dinero(e.total30, pa)}<small>${fnum(e.ventas30)} ventas</small>` }, { t: 'Estado', f: e => si(e.estado, 'Activa', 'Inactiva') }, { t: '', n: 1, f: e => `<div class="ac"><button class="btn sm" data-en="${e._id}">Entrar</button></div>` }], f.filter(e => e.pais === p), { clic: editar }); });
+    document.querySelectorAll('[data-en]').forEach(b => { b.onclick = () => { localStorage.setItem('katu_admin_empresa', b.dataset.en); location.href = 'dashboard.html'; }; }); }
+  const zonas = c => ps.find(p => p.codigo === c)?.zonasHorarias || [];
+  function editar(e) { const m = modal({ clase: 'l', titulo: e ? esc(e.nombre) : 'Nueva empresa', html: '<div id="f"></div>', pie: '<button class="btn p" data-s>Guardar</button>' });
+    const f = formulario(m.q('#f'), [{ k: 'nombre', l: 'Nombre comercial', req: 1 }, { k: 'razonSocial', l: 'Razón social' }, { k: 'pais', l: 'País', t: 'lista', op: ps.filter(p => p.activo).map(p => [p.codigo, `${p.nombre} — ${p.moneda}`]) }, { k: 'zonaHoraria', l: 'Zona horaria', t: 'lista', op: zonas(e?.pais || ps.find(p => p.activo)?.codigo) }, { k: 'idFiscal', l: 'Identificación fiscal' }, { k: 'slug', l: 'Identificador web', req: 1, ayuda: 'Dirección de su tienda: /t/identificador' }, { k: 'correo', l: 'Correo' }, { k: 'telefono', l: 'Teléfono' }, { k: 'direccion', l: 'Dirección' }, { k: 'ciudad', l: 'Ciudad' }, { t: 'titulo', l: 'Módulos' }, ...Object.entries(MD).map(([k, v]) => ({ k: 'modulos.' + k, l: v, t: 'si', w: 4, def: k !== 'kiosco' })), ...(e ? [{ k: 'estado', l: 'Empresa activa', t: 'si' }] : [{ t: 'titulo', l: 'Administrador inicial' }, { k: 'admin.nombre', l: 'Nombre', w: 4, req: 1 }, { k: 'admin.correo', l: 'Correo', w: 4, req: 1 }, { k: 'admin.password', l: 'Contraseña', t: 'clave', w: 4, req: 1 }])], e || {});
+    f.campo('pais').onchange = x => { f.campo('zonaHoraria').innerHTML = zonas(x.target.value).map(z => `<option>${z}</option>`).join(''); };
+    m.q('[data-s]').onclick = async () => { const o = f.validar(); if (!o) return; const r = await datos('/empresas' + (e ? '/' + e._id : ''), e ? 'PUT' : 'POST', o); if (r) { m.cerrar(); toast('Guardado'); cargar(); } }; }
+  $('nv').onclick = () => editar(null); $('q').oninput = pintar; $('pa').onchange = pintar; cargar();
+})();
+</script>
+</body>
+</html>

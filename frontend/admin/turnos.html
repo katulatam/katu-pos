@@ -1,0 +1,37 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Katú POS</title>
+  <link rel="icon" href="../assets/img/favicon.ico">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Sora:wght@500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+  <link rel="stylesheet" href="pos-admin.css">
+</head>
+<body data-pagina="turnos">
+<main class="content"></main>
+<script src="../assets/js/motor.js"></script>
+<script src="pos-admin.js"></script>
+<script>
+(async function () {
+  if (!(await POS.listo)) return;
+
+  document.querySelector('main').innerHTML = `<div class="head"><div><h1>Turnos y arqueos</h1><p>Aperturas, cierres y diferencias de caja.</p></div></div><div class="filtros" id="rg"></div><div class="card" id="t"></div>`;
+  const rg = rango($('rg'), () => cargar(), 6);
+  async function cargar() {
+    const d = await datos('/turnos?' + rg()); if (!d) return;
+    tabla($('t'), [{ t: 'Cajero', f: x => `<b>${esc(x.cajero?.nombre)}</b><small>${esc(x.sede?.nombre)} · ${esc(x.caja?.nombre)}</small>` }, { t: 'Abierto', f: x => fecha(x.abiertoEn) }, { t: 'Cerrado', f: x => x.cerradoEn ? fecha(x.cerradoEn) : '<span class="bd az">Abierto</span>' }, { t: 'Ventas', n: 1, f: x => x.arqueo?.ventas ?? '—' }, { t: 'Total', n: 1, f: x => x.arqueo?.total != null ? dinero(x.arqueo.total) : '—' }, { t: 'Diferencia', n: 1, f: x => x.arqueo?.diferenciaTotal != null ? `<span class="bd ${x.arqueo.diferenciaTotal === 0 ? 'ok' : x.arqueo.diferenciaTotal > 0 ? 'av' : 'mal'}">${dinero(x.arqueo.diferenciaTotal)}</span>` : '—' }], d, { vacio: 'No hay turnos en este período', clic: ver });
+  }
+  async function ver(x) {
+    const r = await datos(`/turnos/${x._id}/resumen`); if (!r) return; const a = r.turno.arqueo || {}, n = k => POS.medios.find(m => m.codigo === k)?.nombre || k;
+    const m = modal({ clase: 'l', titulo: `Turno de ${esc(x.cajero?.nombre)}`, html: `<div class="kpis" style="margin-bottom:16px"><div class="kpi"><div class="k">Ventas</div><div class="v">${r.ventas}</div></div><div class="kpi"><div class="k">Total</div><div class="v">${dinero(r.total)}</div></div><div class="kpi"><div class="k">Base</div><div class="v">${dinero(r.base)}</div></div></div><div class="card" id="a"></div>${r.movimientos.length ? '<h3 style="margin:16px 0 8px">Entradas y salidas</h3><div class="card" id="b"></div>' : ''}${a.notas ? `<div class="aviso i" style="margin-top:14px">${esc(a.notas)}</div>` : ''}`, pie: r.turno.estado === 'abierto' ? '<button class="btn p" data-c>Cerrar turno</button>' : '' });
+    tabla(m.q('#a'), [{ t: 'Medio', f: k => `<b>${esc(n(k))}</b>` }, { t: 'Esperado', n: 1, f: k => dinero(r.esperado[k]) }, { t: 'Contado', n: 1, f: k => a.contado ? dinero(a.contado[k]) : r.turno.estado === 'abierto' ? `<input class="in" type="number" step="any" data-k="${esc(k)}" style="width:150px">` : '—' }, { t: 'Diferencia', n: 1, f: k => a.diferencia ? dinero(a.diferencia[k]) : '—' }], Object.keys(r.esperado));
+    if (r.movimientos.length) tabla(m.q('#b'), [{ t: 'Hora', f: y => fecha(y.en) }, { t: 'Concepto', f: y => esc(y.concepto) }, { t: 'Valor', n: 1, f: y => `${y.tipo === 'egreso' ? '−' : '+'}${dinero(y.monto)}` }], r.movimientos);
+    m.q('[data-c]')?.addEventListener('click', async () => { if (!await confirmar('Cerrar turno', 'El cajero no podrá vender más en este turno.', 'Cerrar turno')) return; const c = await datos(`/turnos/${x._id}/cerrar`, 'POST', { contado: Object.fromEntries(m.qq('[data-k]').map(i => [i.dataset.k, Number(i.value) || 0])), notas: 'Cerrado desde administración' }); if (c) { m.cerrar(); toast('Turno cerrado'); cargar(); } });
+  }
+  cargar();
+})();
+</script>
+</body>
+</html>

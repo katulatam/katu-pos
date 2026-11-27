@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Katú POS</title>
+  <link rel="icon" href="../assets/img/favicon.ico">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Sora:wght@500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+  <link rel="stylesheet" href="pos-admin.css">
+</head>
+<body data-pagina="suscripcion">
+<main class="content"></main>
+<script src="../assets/js/motor.js"></script>
+<script src="pos-admin.js"></script>
+<script>
+(async function () {
+  if (!(await POS.listo)) return;
+  const main = document.querySelector('main');
+  const s = await datos('/cuenta/suscripcion'); if (!s) return;
+  const MOD = { facturacion: 'Facturación electrónica', fiado: 'Fiado', domicilios: 'Domicilios y tienda en línea', gamificacion: 'Gamificación', whatsapp: 'WhatsApp con IA', kiosco: 'Autopago', marketing: 'Marketing' };
+  const EST = { activa: ['Activa', 'ok'], prueba: ['En prueba', 'az'], mora: ['Pago pendiente', 'av'], cancelada: ['Cancelada', 'mal'] };
+  const plata = (n, m) => `${m === 'USD' ? 'US$' : '$'} ${Number(n || 0).toLocaleString('es-CO')}`;
+  const [et, cl] = EST[s.estado] || EST.activa;
+  main.innerHTML = `<div class="head"><div><h1>Mi suscripción</h1><p>Tu plan de Katú POS y tus pagos.</p></div></div>
+    ${s.estado === 'mora' ? `<div class="aviso m"><i class="fa-solid fa-triangle-exclamation"></i> No pudimos cobrar tu suscripción${s.moraDesde ? ` desde el ${fecha(s.moraDesde)}` : ''}. Actualiza tu tarjeta para evitar la suspensión (tienes ${s.diasGracia} días de gracia).</div>` : ''}
+    <div class="grid" style="align-items:start">
+      <div class="card" style="grid-column:span 7"><div class="b">
+        <div style="display:flex;align-items:center;gap:12px"><span style="width:52px;height:52px;border-radius:16px;display:grid;place-items:center;background:linear-gradient(135deg,var(--primary-vivo),#7C6CFF);color:#fff;font-size:22px"><i class="fa-solid fa-crown"></i></span><div><small style="color:var(--muted)">Plan</small><div style="font-family:var(--titulo);font-size:24px;font-weight:800">${esc(s.plan?.nombre || 'Personalizado')}</div></div><span class="bd ${cl}" style="margin-left:auto">${et}</span></div>
+        ${s.plan ? `<p style="color:var(--muted)">${esc(s.plan.descripcion || '')}</p><p><b style="font-size:18px">${plata(s.periodo === 'anual' ? s.plan.precioAnual : s.plan.precioMensual, s.plan.moneda)}</b> <span style="color:var(--muted)">/ ${s.periodo === 'anual' ? 'año' : 'mes'}</span></p>` : ''}
+        ${s.actualHasta ? `<p style="color:var(--muted)">Pagado hasta el <b>${fecha(s.actualHasta)}</b>. La renovación es automática.</p>` : ''}
+        ${s.administradaPorKatu ? '<div class="aviso i"><i class="fa-solid fa-headset"></i> Tu cuenta la administra directamente el equipo de Katú. Escríbenos para cambiar tu plan.</div>' : '<button class="btn p" id="portal" style="align-self:flex-start"><i class="fa-solid fa-credit-card"></i> Administrar pagos y plan</button><small style="color:var(--muted)">Cambia tu tarjeta, descarga tus facturas o cambia o cancela tu plan en el portal seguro de Stripe.</small>'}
+      </div></div>
+      <div class="card" style="grid-column:span 5"><header><h3>Módulos incluidos</h3></header><div class="b">${Object.entries(MOD).map(([k, t]) => `<div style="display:flex;gap:10px;align-items:center;font-size:13.5px"><i class="fa-solid ${s.modulos?.[k] ? 'fa-circle-check' : 'fa-circle-minus'}" style="color:${s.modulos?.[k] ? 'var(--success)' : 'var(--faint)'}"></i>${t}</div>`).join('')}</div></div>
+    </div>`;
+  $('portal') && ($('portal').onclick = async () => { const r = await datos('/cuenta/suscripcion/portal', 'POST'); if (r?.url) location.href = r.url; });
+})();
+</script>
+</body>
+</html>

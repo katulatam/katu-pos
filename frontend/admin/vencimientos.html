@@ -1,0 +1,28 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Katú POS</title>
+  <link rel="icon" href="../assets/img/favicon.ico">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Sora:wght@500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+  <link rel="stylesheet" href="pos-admin.css">
+</head>
+<body data-pagina="vencimientos">
+<main class="content"></main>
+<script src="../assets/js/motor.js"></script>
+<script src="pos-admin.js"></script>
+<script>
+(async function () {
+  if (!(await POS.listo)) return;
+
+  document.querySelector('main').innerHTML = `<div class="head"><div><h1>Vencimientos</h1><p>Lotes por vencer. La venta descuenta primero el que vence antes.</p></div></div><div class="filtros"><div class="chips">${[7, 15, 30, 60].map(d => `<button class="chip ${d === 30 ? 'on' : ''}" data-d="${d}">${d} días</button>`).join('')}</div></div><div class="kpis" id="k"></div><div class="card" id="t"></div>`;
+  let dias = 30;
+  async function cargar() { const d = await datos('/inventario/vencimientos?dias=' + dias); if (!d) return; const v = d.filter(x => x.dias < 0); $('k').innerHTML = `<div class="kpi"><div class="k"><i class="fa-solid fa-skull-crossbones"></i>Ya vencidos</div><div class="v">${v.length}</div><div class="s">${dinero(v.reduce((a, x) => a + x.valor, 0))} a costo</div></div><div class="kpi"><div class="k"><i class="fa-solid fa-hourglass-half"></i>Por vencer</div><div class="v">${d.length - v.length}</div><div class="s">${dinero(d.filter(x => x.dias >= 0).reduce((a, x) => a + x.valor, 0))} a costo</div></div>`; tabla($('t'), [{ t: 'Producto', f: x => `<b>${esc(x.producto.nombre)}</b><small>${x.codigo ? 'Lote ' + esc(x.codigo) : ''}</small>` }, { t: 'Sede', f: x => esc(x.sede?.nombre) }, { t: 'Vence', f: x => `${x.vence} <span class="bd ${x.dias < 0 ? 'mal' : x.dias <= 7 ? 'av' : 'ok'}">${x.dias < 0 ? `venció hace ${-x.dias} días` : x.dias === 0 ? 'hoy' : `en ${x.dias} días`}</span>` }, { t: 'Quedan', n: 1, f: x => fnum(x.restante) }, { t: 'Valor', n: 1, f: x => dinero(x.valor) }], d, { vacio: 'Nada por vencer en este plazo', icono: 'fa-circle-check' }); }
+  document.querySelector('.chips').onclick = e => { const b = e.target.closest('.chip'); if (!b) return; document.querySelectorAll('.chip').forEach(c => c.classList.toggle('on', c === b)); dias = b.dataset.d; cargar(); };
+  cargar();
+})();
+</script>
+</body>
+</html>

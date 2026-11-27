@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Katú POS</title>
+  <link rel="icon" href="../assets/img/favicon.ico">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Sora:wght@500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+  <link rel="stylesheet" href="pos-admin.css">
+</head>
+<body data-pagina="ventas">
+<main class="content"></main>
+<script src="../assets/js/motor.js"></script>
+<script src="pos-admin.js"></script>
+<script>
+(async function () {
+  if (!(await POS.listo)) return;
+
+  const qs = new URLSearchParams(location.search);
+  document.querySelector('main').innerHTML = `<div class="head"><div><h1>Ventas</h1><p id="res"></p></div><div class="acts"><button class="btn" id="xls"><i class="fa-solid fa-file-excel"></i> Excel</button></div></div><div class="filtros" id="rg"></div><div class="filtros"><div class="f g"><label>Buscar</label><input class="in" id="q" placeholder="Número, factura o cliente"></div><div class="f"><label>Estado</label><select class="in" id="es"><option value="">Todas</option><option value="completada">Completadas</option><option value="devuelta_parcial">Con devolución</option><option value="anulada">Anuladas</option></select></div><div class="f"><label>Origen</label><select class="in" id="or"><option value="">Todos</option><option value="caja">Caja</option><option value="domicilio">Domicilio</option></select></div><div class="f"><label>Medio de pago</label><select class="in" id="md"><option value="">Todos</option>${POS.medios.map(m => `<option value="${m.codigo}">${esc(m.nombre)}</option>`).join('')}</select></div><div class="f"><label>Documento</label><select class="in" id="dc"><option value="">Todos</option>${Object.entries(DOC).map(([k, v]) => `<option value="${k}">${v[0] === '—' ? 'No aplica' : v[0]}</option>`).join('')}</select></div></div><div class="card"><div id="t"></div><div class="pag" id="pg"></div></div>`;
+  let pagina = 1;
+  const rg = rango($('rg'), () => { pagina = 1; cargar(); }, qs.get('documento') ? 29 : 0);
+  $('dc').value = qs.get('documento') || '';
+  const filtro = () => `${rg()}&q=${encodeURIComponent($('q').value)}&estado=${$('es').value}&origen=${$('or').value}&medio=${$('md').value}&documento=${$('dc').value}`;
+  async function cargar() {
+    const d = await datos(`/ventas?${filtro()}&pagina=${pagina}`); if (!d) return;
+    $('res').textContent = `${fnum(d.total)} ventas · ${dinero(d.suma)}`;
+    tabla($('t'), [{ t: 'Venta', f: v => `<b>${esc(v.numero)}</b><small>${fecha(v.fecha)}</small>` }, { t: 'Caja', f: v => `${esc(v.caja?.nombre || (v.origen === 'domicilio' ? 'Domicilio' : ''))}<small>${esc(v.cajero?.nombre || '')}</small>` }, { t: 'Cliente', f: v => esc(v.adquiriente?.nombre || v.clienteNombre || '—') }, { t: 'Pago', f: v => esc(v.pagos.map(p => p.nombre).join(', ')) }, { t: 'Documento', f: v => `${badgeDoc(v.documento?.estado)}${v.documento?.numero ? `<small>${esc(v.documento.numero)}</small>` : ''}` }, { t: 'Estado', f: v => `${{ completada: '', devuelta_parcial: '<span class="bd av">Con devolución</span>', anulada: '<span class="bd mal">Anulada</span>' }[v.estado]}${v.offline ? ' <span class="bd vi">Sin conexión</span>' : ''}${v.diferenciaPrecio ? ' <span class="bd av">Precio distinto</span>' : ''}` }, { t: 'Total', n: 1, f: v => `<b>${dinero(v.total)}</b>` }], d.items, { vacio: 'No hay ventas con estos filtros', icono: 'fa-receipt', clic: detalle });
+    const ps = Math.max(1, Math.ceil(d.total / 50)); $('pg').innerHTML = `Página ${pagina} de ${ps} <button class="btn sm" id="a" ${pagina <= 1 ? 'disabled' : ''}>Anterior</button><button class="btn sm" id="b" ${pagina >= ps ? 'disabled' : ''}>Siguiente</button>`;
+    $('a').onclick = () => { pagina--; cargar(); }; $('b').onclick = () => { pagina++; cargar(); };
+  }
+  async function detalle(f) {
+    const d = await datos('/ventas/' + f._id); if (!d) return; const v = d.venta, doc = v.documento || {};
+    const m = modal({ clase: 'l', titulo: `Venta ${esc(v.numero)}`, html: `<div class="mitad" style="margin-bottom:14px"><p style="line-height:1.7;color:var(--muted)">${fecha(v.fecha)}<br>${esc([v.sede?.nombre, v.caja?.nombre, v.cajero?.nombre].filter(Boolean).join(' · '))}<br>${esc(v.adquiriente ? `${v.adquiriente.nombre} — ${v.adquiriente.documento}` : v.clienteNombre || POS.pais.consumidorFinal.nombre)}${v.autorizadoPor ? `<br>Descuento autorizado por ${esc(v.autorizadoPor.nombre)}` : ''}</p><div>${doc.estado && doc.estado !== 'no_aplica' ? `${badgeDoc(doc.estado)} <b>${esc(doc.numero || '')}</b>${doc.codigoUnico ? `<div class="mono" style="margin-top:8px">${esc(doc.codigoUnico)}</div>` : ''}${doc.urlConsulta ? `<a href="${esc(doc.urlConsulta)}" target="_blank" rel="noopener">Consultar documento</a>` : ''}${doc.error ? `<div class="aviso m" style="margin-top:8px">${esc(doc.error)}</div>` : ''}${(doc.observaciones || []).length ? `<div class="aviso a" style="margin-top:8px">${esc(doc.observaciones.join(' · '))}</div>` : ''}` : ''}</div></div><div class="card" id="it"></div><div class="mitad" style="margin-top:14px"><div>${v.pagos.map(p => `<p>${esc(p.nombre)} <b>${dinero(p.monto)}</b>${p.cambio ? ` · cambio ${dinero(p.cambio)}` : ''}${p.referencia ? ` · ${esc(p.referencia)}` : ''}</p>`).join('')}${v.puntosGanados ? `<p>Ganó ${v.puntosGanados} puntos</p>` : ''}</div><div class="n"><p>Base ${dinero(v.base)} · Impuestos ${dinero(v.impuesto)}</p>${v.descuento ? `<p>Ahorro ${dinero(v.descuento)}</p>` : ''}${v.domicilio ? `<p>Domicilio ${dinero(v.domicilio)}</p>` : ''}<h2 style="font-family:var(--titulo)">${dinero(v.total)}</h2></div></div>${d.devoluciones.length ? `<h3 style="margin:16px 0 8px">Devoluciones</h3><div class="card" id="dv"></div>` : ''}`, pie: `${['pendiente', 'error', 'rechazada'].includes(doc.estado) ? '<button class="btn" data-r>Reintentar documento</button>' : ''}${v.estado !== 'anulada' ? '<button class="btn d" data-d>Devolver</button>' : ''}` });
+    tabla(m.q('#it'), [{ t: 'Producto', f: i => `<b>${esc(i.nombre)}</b>${i.promocion ? `<small>${esc(i.promocion)}</small>` : ''}` }, { t: 'Cantidad', n: 1, f: i => `${fnum(i.cantidad)} ${i.porPeso ? i.unidad : ''}${i.cantidadDevuelta ? `<small>devuelto ${fnum(i.cantidadDevuelta)}</small>` : ''}` }, { t: 'Precio', n: 1, f: i => dinero(i.precioUnitario) }, { t: 'Impuesto', n: 1, f: i => i.impuestoTipo === 'excluido' ? 'Excluido' : `${i.impuestoPct}%` }, { t: 'Total', n: 1, f: i => dinero(i.total) }], v.items);
+    if (d.devoluciones.length) tabla(m.q('#dv'), [{ t: 'Fecha', f: x => fecha(x.createdAt) }, { t: 'Motivo', f: x => `${esc(x.motivo)}<small>${esc(x.usuario?.nombre || '')}</small>` }, { t: 'Nota crédito', f: x => x.documento?.estado === 'no_aplica' ? '—' : `${badgeDoc(x.documento?.estado)} ${esc(x.documento?.numero || '')}${x.documento?.error ? `<small>${esc(x.documento.error)}</small>` : ''}` }, { t: 'Valor', n: 1, f: x => dinero(x.monto) }], d.devoluciones);
+    m.q('[data-r]')?.addEventListener('click', async () => { const r = await datos(`/ventas/${v._id}/reintentar-documento`, 'POST', {}); if (r) { m.cerrar(); toast(r.error ? 'Sigue con error: ' + r.error : 'Documento actualizado'); cargar(); } });
+    m.q('[data-d]')?.addEventListener('click', () => { m.cerrar(); devolver(v); });
+  }
+  function devolver(v) {
+    const m = modal({ clase: 'l', titulo: `Devolver ${esc(v.numero)}`, html: `<div class="card" id="it" style="margin-bottom:14px"></div><div id="fm"></div>`, pie: '<button class="btn" data-t>Marcar todo</button><button class="btn p" data-s>Devolver</button>' });
+    tabla(m.q('#it'), [{ t: 'Producto', f: i => esc(i.nombre) }, { t: 'Disponible', n: 1, f: i => fnum(Motor.r3(i.cantidad - i.cantidadDevuelta)) }, { t: 'Devolver', n: 1, f: i => `<input class="in" style="width:110px" type="number" step="any" min="0" max="${Motor.r3(i.cantidad - i.cantidadDevuelta)}" data-i="${i._id}" value="0">` }], v.items);
+    const f = formulario(m.q('#fm'), [{ k: 'medio', l: 'Devolver el dinero por', t: 'lista', op: POS.medios.filter(x => x.tipo !== 'qr').map(x => [x.codigo, x.nombre]), def: v.pagos[0]?.medio }, { k: 'motivo', l: 'Motivo', req: 1 }]);
+    m.q('[data-t]').onclick = () => m.qq('[data-i]').forEach(i => { i.value = i.max; });
+    m.q('[data-s]').onclick = async () => { const o = f.validar(); if (!o) return; const items = m.qq('[data-i]').map(i => ({ item: i.dataset.i, cantidad: Number(i.value) })).filter(x => x.cantidad > 0); if (!items.length) return toast('Indica qué se devuelve', 'mal'); const r = await datos(`/ventas/${v._id}/devolver`, 'POST', { ...o, items }); if (r) { m.cerrar(); toast('Devuelto ' + dinero(r.monto)); cargar(); } };
+  }
+  ['es', 'or', 'md', 'dc'].forEach(i => { $(i).onchange = () => { pagina = 1; cargar(); }; });
+  let t; $('q').oninput = () => { clearTimeout(t); t = setTimeout(() => { pagina = 1; cargar(); }, 300); };
+  $('xls').onclick = () => descargar('/ventas/exportar?' + filtro(), `ventas-${$('rD').value}.xlsx`);
+  cargar();
+})();
+</script>
+</body>
+</html>

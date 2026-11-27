@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html lang="es" data-tema="oscuro">
+<head>
+  <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Ingreso — Katú POS</title>
+  <link rel="icon" href="../assets/img/favicon.ico">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Sora:wght@500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+  <link rel="stylesheet" href="pos-admin.css">
+</head>
+<body>
+<main class="entrada"><form class="modal" id="f">
+  <div class="sb-logo" style="padding:0;font-size:22px"><i class="fa-solid fa-bolt"></i><div>Katú <span>POS</span></div></div>
+  <div class="f"><label for="c">Correo</label><input class="in" id="c" type="email" autocomplete="username" required></div>
+  <div class="f"><label for="p">Contraseña</label><input class="in" id="p" type="password" autocomplete="current-password" required></div>
+  <div class="aviso m" id="e" hidden></div>
+  <button class="btn p" style="height:46px">Ingresar</button>
+  <button type="button" id="olv" style="background:none;border:none;color:var(--primary);font-size:13px;font-weight:600">¿Olvidaste tu contraseña?</button>
+</form>
+<form class="modal" id="fo" hidden>
+  <div class="sb-logo" style="padding:0;font-size:22px"><i class="fa-solid fa-bolt"></i><div>Katú <span>POS</span></div></div>
+  <p style="color:var(--muted);font-size:13.5px;line-height:1.5">Escribe tu correo y te enviaremos un enlace para crear una contraseña nueva.</p>
+  <div class="f"><label for="co">Correo</label><input class="in" id="co" type="email" autocomplete="username" required></div>
+  <div class="aviso i" id="ok" hidden>Si el correo está registrado, te llegará un enlace en unos minutos. Revisa también la carpeta de spam.</div>
+  <button class="btn p" style="height:46px">Enviar enlace</button>
+  <button type="button" id="vol" style="background:none;border:none;color:var(--primary);font-size:13px;font-weight:600">Volver al ingreso</button>
+</form></main>
+<script>
+  if (localStorage.getItem('katu_admin_token')) location.replace('dashboard.html');
+  const e = document.getElementById('e'), mal = t => { e.textContent = t; e.hidden = false; };
+  if (new URLSearchParams(location.search).get('off')) mal('La empresa está inactiva. Comunícate con Katú.');
+  const fo = document.getElementById('fo'), f = document.getElementById('f');
+  document.getElementById('olv').onclick = () => { f.hidden = true; fo.hidden = false; co.value = c.value; co.focus(); };
+  document.getElementById('vol').onclick = () => { fo.hidden = true; f.hidden = false; };
+  fo.onsubmit = async ev => { ev.preventDefault(); await fetch('/api/v1/auth/olvide', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ correo: co.value }) }).catch(() => {}); document.getElementById('ok').hidden = false; };
+  document.getElementById('f').onsubmit = async ev => {
+    ev.preventDefault(); e.hidden = true;
+    const r = await fetch('/api/v1/auth/login', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ correo: c.value, password: p.value }) }).then(x => x.json()).catch(() => ({ error: 'No hay conexión con el servidor' }));
+    if (!r.success) return mal(r.error);
+    const rol = r.data.user.rol;
+    if (rol === 'domiciliario') { localStorage.setItem('katu_domi_token', r.data.token); return location.replace('/domiciliario/'); }
+    if (rol === 'cajero') { localStorage.setItem('katu_pos_token', r.data.token); localStorage.setItem('katu_pos_user', JSON.stringify(r.data.user)); return location.replace('/pos/'); }
+    localStorage.setItem('katu_admin_token', r.data.token); localStorage.setItem('katu_admin_user', JSON.stringify(r.data.user));
+    location.replace(rol === 'super' ? 'empresas.html' : rol === 'bodega' ? 'inventario.html' : rol === 'asesor' ? 'whatsapp.html' : 'dashboard.html');
+  };
+</script>
+</body>
+</html>

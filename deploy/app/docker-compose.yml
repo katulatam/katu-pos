@@ -1,0 +1,46 @@
+# Stack de Portainer para CADA servidor de aplicación (app1 y app2).
+# Portainer → Stacks → Add stack → Repository (este repositorio, ruta deploy/app/docker-compose.yml)
+# o pega este archivo en "Web editor". Las variables van en "Environment variables"
+# del stack (usa deploy/.env.produccion.example como lista). Deben ser IDÉNTICAS en
+# ambos servidores, en especial JWT_SECRET (si no, las sesiones fallan al balancear).
+services:
+  katupos:
+    build:
+      context: ../..
+      dockerfile: Dockerfile
+    image: katupos/app:${VERSION:-latest}
+    container_name: katupos
+    restart: unless-stopped
+    ports:
+      # Solo el balanceador debe llegar a este puerto (firewall de Linode: permitir 3008 solo desde su IP privada)
+      - "3008:3008"
+    environment:
+      NODE_ENV: production
+      PORT: 3008
+      PUBLIC_URL: ${PUBLIC_URL}
+      DOMINIO_BASE: ${DOMINIO_BASE}
+      LANDING_URL: ${LANDING_URL}
+      MONGO_URI: ${MONGO_URI}
+      JWT_SECRET: ${JWT_SECRET}
+      JWT_EXPIRES_IN: ${JWT_EXPIRES_IN:-12h}
+      KATU_ADMIN_EMAIL: ${KATU_ADMIN_EMAIL}
+      KATU_ADMIN_PASSWORD: ${KATU_ADMIN_PASSWORD}
+      MODO_DEMO: "false"
+      ALANUBE_API_URL: ${ALANUBE_API_URL}
+      ALANUBE_TOKEN: ${ALANUBE_TOKEN}
+      KATUPAY_URL: ${KATUPAY_URL}
+      TWILIO_ACCOUNT_SID: ${TWILIO_ACCOUNT_SID}
+      TWILIO_AUTH_TOKEN: ${TWILIO_AUTH_TOKEN}
+      OPENROUTER_API_KEY: ${OPENROUTER_API_KEY}
+      OPENROUTER_MODEL: ${OPENROUTER_MODEL:-openai/gpt-4o-mini}
+      SENDGRID_API_KEY: ${SENDGRID_API_KEY}
+      SENDGRID_FROM: ${SENDGRID_FROM}
+      STRIPE_SECRET_KEY: ${STRIPE_SECRET_KEY}
+      STRIPE_WEBHOOK_SECRET: ${STRIPE_WEBHOOK_SECRET}
+      DIAS_GRACIA_SUSCRIPCION: ${DIAS_GRACIA_SUSCRIPCION:-7}
+      TZ: America/Bogota
+      # Límite de memoria de Node.js: 384 MB en servidores de 1 GB; súbelo (ej. 1024) al crecer
+      NODE_OPTIONS: --max-old-space-size=${NODE_MEMORIA_MB:-384}
+    logging:
+      driver: json-file
+      options: { max-size: "20m", max-file: "5" }

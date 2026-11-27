@@ -1,0 +1,20 @@
+# MongoDB en réplica (rs0) — un nodo por servidor. Despliega este stack en los TRES
+# nodos (por ejemplo: app1, app2 y el balanceador, o tres Linodes pequeños) cambiando
+# solo MONGO_NODO. Escucha en la IP privada; el firewall de Linode debe permitir
+# 27017 únicamente entre los nodos y desde los servidores de la app.
+# Antes: crea el archivo de clave compartida (ver deploy/README.md, paso 3).
+services:
+  mongo:
+    image: mongo:7.0
+    container_name: katupos-mongo-${MONGO_NODO:-1}
+    restart: unless-stopped
+    command: ["mongod", "--replSet", "rs0", "--bind_ip_all", "--keyFile", "/etc/mongo/keyfile", "--wiredTigerCacheSizeGB", "${MONGO_CACHE_GB:-1}"]
+    ports:
+      - "${IP_PRIVADA}:27017:27017"
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: ${MONGO_ROOT_USER:-root}
+      MONGO_INITDB_ROOT_PASSWORD: ${MONGO_ROOT_PASSWORD}
+    volumes:
+      - /srv/katupos/mongo/data:/data/db
+      - /srv/katupos/mongo/keyfile:/etc/mongo/keyfile:ro
+    logging: { driver: json-file, options: { max-size: "20m", max-file: "5" } }

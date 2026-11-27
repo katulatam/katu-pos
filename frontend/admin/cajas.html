@@ -1,0 +1,31 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Katú POS</title>
+  <link rel="icon" href="../assets/img/favicon.ico">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Sora:wght@500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+  <link rel="stylesheet" href="pos-admin.css">
+</head>
+<body data-pagina="cajas">
+<main class="content"></main>
+<script src="../assets/js/motor.js"></script>
+<script src="../assets/js/bascula.js"></script>
+<script src="pos-admin.js"></script>
+<script>
+(async function () {
+  if (!(await POS.listo)) return;
+
+  const sedes = await datos('/sedes') || []; const ag = o => ['agente'].includes(o.bascula?.modo) || o.impresora?.modo === 'agente', bs = o => o.bascula?.modo !== 'ninguna';
+  const C = crud({ ruta: '/cajas', titulo: 'Cajas y equipos', sub: 'Configura en cada caja la báscula y la impresora.', nuevo: 'Nueva caja', icono: 'fa-desktop', clase: 'l',
+    columnas: [{ t: 'Caja', f: c => `<b>${esc(c.nombre)}</b><small>${esc(c.sede?.nombre)}${c.tipo === 'autopago' ? ' · Autopago' : ''}</small>` }, { t: 'Báscula', f: c => ({ ninguna: '—', webserial: 'USB / RS-232 directo', agente: 'Agente local' }[c.bascula?.modo] || '—') }, { t: 'Impresora', f: c => ({ ninguna: '—', navegador: 'Navegador', agente: 'Térmica directa' }[c.impresora?.modo]) + (c.impresora?.modo !== 'ninguna' ? `<small>${c.impresora?.ancho} mm</small>` : '') }, { t: 'Estado', f: c => si(c.activo, 'Activa', 'Inactiva') }],
+    campos: [{ k: 'nombre', l: 'Nombre', req: 1 }, { k: 'tipo', l: 'Tipo', t: 'lista', op: [['caja', 'Caja atendida por un cajero'], ['autopago', 'Autopago: el cliente escanea y paga solo']], ayuda: 'El autopago usa los medios de pago del canal Kiosco y requiere el módulo Kiosco activo. Solo acepta QR, datáfono integrado o kiosco de efectivo.' }, { k: 'sede', l: 'Sede', t: 'lista', op: sedes.map(s => [s._id, s.nombre]), req: 1 }, { t: 'titulo', l: 'Báscula' }, { k: 'bascula.modo', l: 'Conexión', t: 'lista', op: [['ninguna', 'Sin báscula'], ['webserial', 'Directa: RS-232 o USB al computador (Chrome/Edge)'], ['agente', 'Por el agente local']], ayuda: 'RS-232 se conecta con un adaptador USB-serial' }, { k: 'bascula.perfil', l: 'Perfil', t: 'lista', op: Object.entries(Bascula.PERFILES).map(([k, p]) => [k, p.nombre]), si: bs }, { k: 'bascula.baudRate', l: 'Velocidad (baudios)', t: 'lista', w: 3, op: [1200, 2400, 4800, 9600, 19200, 38400, 57600, 115200], def: 9600, si: bs }, { k: 'bascula.dataBits', l: 'Bits', t: 'lista', w: 3, op: [8, 7], def: 8, si: bs }, { k: 'bascula.parity', l: 'Paridad', t: 'lista', w: 3, op: [['none', 'Ninguna'], ['even', 'Par'], ['odd', 'Impar']], si: bs }, { k: 'bascula.stopBits', l: 'Parada', t: 'lista', w: 3, op: [1, 2], def: 1, si: bs }, { k: 'bascula.comando', l: 'Comando para pedir peso', w: 4, ph: 'vacío = transmite sola', ayuda: 'Admite \\r \\n \\x05', si: bs }, { k: 'bascula.intervaloMs', l: 'Cada cuántos ms', t: 'numero', w: 4, si: bs }, { k: 'bascula.unidad', l: 'Unidad', t: 'lista', w: 4, op: ['kg', 'g', 'lb'], si: bs }, { k: 'bascula.expresion', l: 'Expresión para leer el peso', w: 8, ph: 'vacío = automática', si: bs }, { k: 'bascula.divisor', l: 'Dividir entre', t: 'numero', w: 4, def: 1, ayuda: '1000 si envía 01250 por 1,250', si: bs }, { k: 'bascula.puerto', l: 'Puerto (agente)', ph: 'COM3 o /dev/ttyUSB0', si: o => o.bascula?.modo === 'agente' }, { t: 'titulo', l: 'Impresora' }, { k: 'impresora.modo', l: 'Impresión', t: 'lista', op: [['navegador', 'Navegador (cualquier impresora)'], ['agente', 'Térmica directa por el agente (ESC/POS)'], ['ninguna', 'Sin impresora']] }, { k: 'impresora.ancho', l: 'Papel', t: 'lista', op: [[80, '80 mm'], [58, '58 mm']] }, { k: 'impresora.destino', l: 'Destino (agente)', ph: 'tcp://192.168.1.50:9100 o serial:COM4', si: o => o.impresora?.modo === 'agente' }, { k: 'impresora.abrirCajon', l: 'Abrir cajón al cobrar en efectivo', t: 'si', si: o => o.impresora?.modo === 'agente' }, { k: 'impresora.automatica', l: 'Imprimir siempre al terminar', t: 'si', def: true }, { t: 'titulo', l: 'Agente local' }, { k: 'agenteUrl', l: 'Dirección del agente', def: 'ws://127.0.0.1:9108', si: ag }, { k: 'activo', l: 'Activa', t: 'si', def: true }],
+    alAbrir: (x, f, fm) => { const p = fm.campo('bascula.perfil'); p?.addEventListener('change', () => { const b = Bascula.PERFILES[p.value]; ['baudRate', 'dataBits', 'parity', 'stopBits', 'comando', 'intervaloMs', 'unidad'].forEach(k => { const c = fm.campo('bascula.' + k); if (c) c.value = b[k]; }); }); },
+    preparar: o => { ['baudRate', 'dataBits', 'stopBits'].forEach(k => { o.bascula[k] = Number(o.bascula[k]); }); o.impresora.ancho = Number(o.impresora.ancho); if (!o.agenteUrl) o.agenteUrl = 'ws://127.0.0.1:9108'; return o; } });
+  C.cargar();
+})();
+</script>
+</body>
+</html>

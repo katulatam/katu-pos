@@ -1,0 +1,29 @@
+# Stack de Portainer para el SERVIDOR DE BALANCEO (katupos-lb): nginx + renovación del certificado.
+# Antes de desplegar, en katupos-lb deben existir:
+#   /srv/katupos/nginx/katupos.conf y /srv/katupos/nginx/snippets/  (copiados de deploy/nginx/)
+#   /srv/katupos/landing/                                           (copiado de landing/)
+#   /srv/katupos/secrets/linode.ini y el certificado en /srv/katupos/letsencrypt (paso 4)
+services:
+  nginx:
+    image: nginx:1.27-alpine
+    container_name: katupos-nginx
+    restart: unless-stopped
+    ports: ["80:80", "443:443"]
+    volumes:
+      - /srv/katupos/nginx/katupos.conf:/etc/nginx/conf.d/default.conf:ro
+      - /srv/katupos/nginx/snippets:/etc/nginx/snippets:ro
+      - /srv/katupos/landing:/usr/share/nginx/landing:ro
+      - /srv/katupos/letsencrypt:/etc/letsencrypt:ro
+    # Recarga cada 12 h para tomar el certificado renovado
+    command: /bin/sh -c "while :; do sleep 12h; nginx -s reload; done & nginx -g 'daemon off;'"
+    logging: { driver: json-file, options: { max-size: "20m", max-file: "5" } }
+
+  certbot:
+    image: certbot/dns-linode:latest
+    container_name: katupos-certbot
+    restart: unless-stopped
+    volumes:
+      - /srv/katupos/letsencrypt:/etc/letsencrypt
+      - /srv/katupos/secrets:/secrets:ro
+    # Intenta renovar dos veces al día (solo renueva si faltan menos de 30 días)
+    entrypoint: /bin/sh -c "trap exit TERM; while :; do certbot renew --dns-linode --dns-linode-credentials /secrets/linode.ini --dns-linode-propagation-seconds 180 --quiet; sleep 12h & wait $${!}; done"

@@ -1,0 +1,69 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <title>Katú</title>
+  <link rel="icon" href="/assets/img/favicon.ico">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Sora:wght@600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
+  <link rel="stylesheet" href="/tienda/tienda.css">
+</head>
+<body>
+<header class="cab"><div><a class="pill" id="vo" aria-label="Volver"><i class="fa-solid fa-arrow-left"></i></a><div class="sp"><h1>Tu pedido</h1></div></div></header>
+<main><div class="dosc"><div><section class="caja"><h3><i class="fa-solid fa-truck-fast"></i>Entrega</h3><div id="en"></div></section><section class="caja"><h3><i class="fa-solid fa-user"></i>Contacto</h3><div id="cn"></div></section><section class="caja"><h3><i class="fa-solid fa-wallet"></i>Pago</h3><div id="pg"></div></section></div><aside><section class="caja"><h3><i class="fa-solid fa-basket-shopping"></i>Productos</h3><div id="ls"></div></section><section class="caja" id="to"></section></aside></div></main>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+<script src="/assets/js/motor.js"></script><script src="/tienda/tienda.js"></script>
+<script>
+(async function () {
+  const d = await cargar(); if (!d) return;
+  $('vo').href = '/t/' + slug;
+  if (!lineas().length) { document.querySelector('main').innerHTML = `<div class="caja" style="text-align:center;padding:60px 20px"><h2>Tu pedido está vacío</h2><a class="pill" href="/t/${slug}">Ver productos</a></div>`; return; }
+  let tipo = 'domicilio', medio = d.medios[0]?.codigo, cot = null, cuenta = null; const id = uuid();
+  if (token()) { const r = await api('/tienda/cuenta/yo'); if (r.success) cuenta = r.data; else localStorage.removeItem('katu_cli_token'); }
+  async function cotizar() { const l = lugar.leer(); cot = null; if (tipo === 'domicilio' && l) { const r = await api(`/tienda/t/${slug}/cotizar`, 'POST', { lat: l.lat, lng: l.lng, total: calcular().totalProductos }); if (r.success) cot = r.data; } entrega(); totales(); }
+  function entrega() {
+    const l = lugar.leer();
+    $('en').innerHTML = `${d.empresa.recoger ? `<div class="g2" style="margin-bottom:10px"><button class="op ${tipo === 'domicilio' ? 'on' : ''}" data-t="domicilio" style="margin:0"><i class="fa-solid fa-motorcycle"></i>A domicilio</button><button class="op ${tipo === 'recoger' ? 'on' : ''}" data-t="recoger" style="margin:0"><i class="fa-solid fa-store"></i>Recoger en tienda</button></div>` : ''}${tipo === 'domicilio' ? `<button class="op" id="lu"><i class="fa-solid fa-location-dot"></i><span>${l ? `${esc(l.direccion)}<small>${esc(l.detalle || 'Toca para cambiar')}</small>` : 'Marcar dirección en el mapa'}</span></button>${cuenta?.direcciones?.length ? `<div class="chs" style="margin-bottom:10px">${cuenta.direcciones.map((x, i) => `<button class="ch" data-d="${i}"><i class="fa-solid fa-house"></i> ${esc(x.alias)}</button>`).join('')}</div>` : ''}${cot ? (cot.cubre ? (cot.abierta ? `<div class="av b"><i class="fa-solid fa-circle-check"></i><span>${esc(cot.nombreSede)} · ${(cot.distancia / 1000).toLocaleString(d.pais.locale, { maximumFractionDigits: 1 })} km · ${cot.tarifa ? dinero(cot.tarifa) : 'gratis'}</span></div>` : `<div class="av i"><i class="fa-solid fa-clock"></i><span>Cerrado ahora${cot.horario ? `. Atiende de ${esc(cot.horario)}` : ''}.</span></div>`) : '<div class="av m"><i class="fa-solid fa-circle-xmark"></i><span>Esa dirección está fuera de la zona de cobertura.</span></div>') : ''}${cot?.cubre && calcular().totalProductos < cot.pedidoMinimo ? `<div class="av i"><i class="fa-solid fa-circle-info"></i><span>Te faltan ${dinero(cot.pedidoMinimo - calcular().totalProductos)} para el pedido mínimo.</span></div>` : ''}<textarea class="in" id="nt" placeholder="Indicaciones para el domiciliario">${esc($('nt')?.value || '')}</textarea>` : `<select class="in" id="sd">${d.sedes.map(s => `<option value="${s._id}">${esc(s.nombre)} — ${esc(s.direccion || '')}</option>`).join('')}</select>`}`;
+    $('en').querySelectorAll('[data-t]').forEach(b => { b.onclick = () => { tipo = b.dataset.t; cotizar(); }; });
+    $('en').querySelectorAll('[data-d]').forEach(b => { b.onclick = () => { lugar.poner(cuenta.direcciones[b.dataset.d]); cotizar(); }; });
+    if ($('lu')) $('lu').onclick = async () => { if (await elegirLugar(l)) cotizar(); };
+  }
+  function contacto() {
+    $('cn').innerHTML = cuenta ? `<div class="av b"><i class="fa-solid fa-star"></i><span>Pides como <b>${esc(cuenta.nombre)}</b>${d.empresa.gamificacion ? ' y ganas puntos con esta compra' : ''}.</span></div>` : `<button class="op" id="ig"><i class="fa-solid fa-star"></i><span>Ingresar o crear cuenta<small>${d.empresa.gamificacion ? 'Gana puntos, sube de nivel y guarda tus direcciones' : 'Guarda tus direcciones y pedidos'}</small></span></button><div class="g2"><div><label class="k">Nombre</label><input class="in" id="no" autocomplete="name"></div><div><label class="k">Celular</label><input class="in" id="te" inputmode="tel" autocomplete="tel"></div></div>`;
+    $('cn').insertAdjacentHTML('beforeend', `<details style="margin-top:12px"><summary style="cursor:pointer;font-weight:600;font-size:14px">Necesito factura a mi nombre</summary><div class="g2" style="margin-top:12px"><select class="in" id="fT">${d.pais.tiposDocumento.map(t => `<option value="${esc(t.codigo)}">${esc(t.nombre)}</option>`).join('')}</select><input class="in" id="fD" placeholder="Número"><input class="in" id="fN" placeholder="Nombre o razón social"><input class="in" id="fE" type="email" placeholder="Correo"></div></details>`);
+    if ($('ig')) $('ig').onclick = async () => { cuenta = await ingresar(d.pais.codigo) || cuenta; contacto(); entrega(); };
+  }
+  function pago() {
+    const m = d.medios.find(x => x.codigo === medio), pesa = lineas().some(l => l.porPeso);
+    $('pg').innerHTML = d.medios.map(x => `<button class="op ${x.codigo === medio ? 'on' : ''}" data-m="${esc(x.codigo)}"><i class="fa-solid ${esc(x.icono)}"></i><span>${esc(x.nombre)}<small>${{ efectivo: 'Pagas al recibir', datafono: 'El domiciliario lleva el datáfono', qr: 'Pagas en línea escaneando el código', manual: 'Coordinas con la tienda' }[x.tipo] || ''}</small></span></button>`).join('') + (m?.tipo === 'efectivo' ? `<label class="k">¿Con cuánto pagas? (opcional)</label><input class="in" id="pc" inputmode="decimal" placeholder="Para llevarte el cambio">` : '') + (m?.tipo === 'qr' && pesa ? '<div class="av i" style="margin-top:8px"><i class="fa-solid fa-weight-scale"></i><span>Llevas productos por peso: te mostramos el QR cuando pesemos tu pedido, con el valor exacto.</span></div>' : '');
+    $('pg').querySelectorAll('[data-m]').forEach(b => { b.onclick = () => { medio = b.dataset.m; pago(); }; });
+  }
+  function productos() { const c = calcular(); $('ls').innerHTML = c.lineas.map(l => { const p = d.idx.get(l.producto); return `<div class="ln"><span class="d">${esc(l.nombre)}<small>${l.promocion ? `<b style="color:var(--v)">${esc(l.promocion.nombre)}</b> · ` : ''}${dinero(l.total)}${l.porPeso ? ' aprox.' : ''}</small></span><span class="cnt"><button data-m="${l.producto}">−</button><b>${cant(l.cantidad, p)}</b><button data-a="${l.producto}">+</button></span></div>`; }).join(''); }
+  $('ls').onclick = e => { const a = e.target.closest('[data-a]'), m = e.target.closest('[data-m]'); const k = a?.dataset.a || m?.dataset.m; if (!k) return; carro.poner(k, (carro.leer()[k] || 0) + (a ? 1 : -1) * paso(d.idx.get(k))); if (!lineas().length) return location.reload(); productos(); pago(); cotizar(); };
+  function totales() {
+    const dom = tipo === 'domicilio' && cot?.cubre ? cot.tarifa : 0, c = calcular(dom), pesa = c.lineas.some(l => l.porPeso);
+    const listo = tipo === 'recoger' || (cot?.cubre && cot.abierta && c.totalProductos >= cot.pedidoMinimo);
+    $('to').innerHTML = `<div class="fila"><span>Productos</span><span>${dinero(c.subtotal)}</span></div>${c.descuento ? `<div class="fila" style="color:var(--v)"><span>Ahorro</span><span>−${dinero(c.descuento)}</span></div>` : ''}${tipo === 'domicilio' ? `<div class="fila"><span>Domicilio</span><span>${cot?.cubre ? (dom ? dinero(dom) : 'Gratis') : '—'}</span></div>` : ''}<div class="fila t"><span>Total${pesa ? ' aprox.' : ''}</span><span>${dinero(c.total)}</span></div>${pesa ? '<p style="font-size:12.5px;color:var(--t2);margin-top:6px;line-height:1.5">El valor final se ajusta con el peso real.</p>' : ''}<button class="bt" id="ok" style="margin-top:16px" ${listo ? '' : 'disabled'}>Hacer pedido</button>`;
+    $('ok').onclick = pedir;
+  }
+  // Colombia escribe 50.000; México 100.50: depende de los decimales del país
+  const valorEscrito = t => {
+  const s = String(t || '').replace(/[^\d.,]/g, '');
+  if (!d.pais.decimales) return Number(s.replace(/[.,]/g, '')) || 0;
+  const m = s.match(new RegExp(`[.,](\\d{1,${d.pais.decimales}})$`));
+  return Number((m ? s.slice(0, m.index) : s).replace(/[.,]/g, '') + (m ? `.${m[1]}` : '')) || 0;
+  };
+  async function pedir(e) {
+    const l = lugar.leer(), b = { uuid: id, tipo, medioPago: medio, items: lineas().map(x => ({ producto: x.producto, cantidad: x.cantidad })), contacto: { nombre: $('no')?.value, telefono: $('te')?.value }, pagaCon: valorEscrito($('pc')?.value) || undefined, sede: $('sd')?.value };
+    if (tipo === 'domicilio') b.entrega = { ...l, notas: $('nt')?.value };
+    if ($('fD')?.value.trim()) { b.adquiriente = { tipoDocumento: $('fT').value, documento: $('fD').value.trim(), nombre: $('fN').value.trim(), correo: $('fE').value.trim() }; if (!b.adquiriente.nombre) return toast('Falta el nombre para la factura'); }
+    e.target.disabled = true; const r = await api(`/tienda/t/${slug}/pedidos`, 'POST', b);
+    if (!r.success) { e.target.disabled = false; return toast(r.error); }
+    carro.vaciar(); location.replace('/seguimiento/' + r.data.seguimiento);
+  }
+  contacto(); pago(); productos(); cotizar();
+})();
+</script>
+</body>
+</html>

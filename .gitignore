@@ -1,0 +1,13 @@
+node_modules
+.env
+.data
+*.log
+mobile/.expo
+mobile/dist
+.claude/settings.local.json
+
+# Paquetes y respaldos locales
+*.tgz
+*.gz
+# Repositorio vacío que creó create-expo-app (guardado, no se sube)
+mobile/.git-expo-vacio

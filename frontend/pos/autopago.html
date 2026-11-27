@@ -1,0 +1,26 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <title>Autopago — Katú POS</title>
+  <meta name="theme-color" content="#EEF2F7"><link rel="manifest" href="manifest.webmanifest">
+  <link rel="icon" href="../assets/img/favicon.ico">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Sora:wght@500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+  <link rel="stylesheet" href="pos.css">
+  <link rel="stylesheet" href="autopago.css">
+</head>
+<body>
+<div class="ap" id="ap" hidden>
+  <header class="ap-barra">
+    <button class="ap-marca" id="apMarca" aria-label="Menú del personal (mantén presionado)"><span id="apLogo"></span><b id="apEmpresa"></b><em>Autopago</em></button>
+    <div class="sep"></div>
+    <span class="pastilla" id="apRed" hidden><span class="pt"></span><span>Sin conexión</span></span>
+    <button class="ap-ayuda" id="apAyuda"><i class="fa-solid fa-hand"></i> Ayuda</button>
+  </header>
+  <main class="ap-vista" id="apVista"></main>
+</div>
+<script src="../assets/js/motor.js"></script><script src="../assets/js/bascula.js"></script>
+<script src="base.js"></script><script src="equipos.js"></script><script src="autopago.js"></script>
+</body>
+</html>

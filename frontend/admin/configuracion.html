@@ -1,0 +1,29 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Katú POS</title>
+  <link rel="icon" href="../assets/img/favicon.ico">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Sora:wght@500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+  <link rel="stylesheet" href="pos-admin.css">
+</head>
+<body data-pagina="configuracion">
+<main class="content"></main>
+<script src="../assets/js/motor.js"></script>
+<script src="pos-admin.js"></script>
+<script>
+(async function () {
+  if (!(await POS.listo)) return;
+
+  document.querySelector('main').innerHTML = `<div class="head"><div><h1>Configuración</h1><p>Datos de la empresa y comportamiento de la caja.</p></div><div class="acts"><button class="btn p" id="s">Guardar cambios</button></div></div><div class="kpis"><div class="kpi"><div class="k"><i class="fa-solid fa-earth-americas"></i>País</div><div class="v">${esc(POS.pais.nombre)}</div></div><div class="kpi"><div class="k"><i class="fa-solid fa-coins"></i>Moneda</div><div class="v">${esc(POS.pais.moneda)}</div><div class="s">${POS.pais.decimales} decimales · ${dinero(1234567.891)}</div></div><div class="kpi"><div class="k"><i class="fa-regular fa-clock"></i>Hora local</div><div class="v">${fecha(new Date(), { timeStyle: 'short' })}</div><div class="s">${esc(POS.empresa.zonaHoraria)}</div></div></div><div class="card"><header><h3>Empresa</h3></header><div class="b"><div id="f1"></div></div></div><div class="card"><header><h3>Caja</h3></header><div class="b"><div id="f2"></div></div></div>${POS.empresa.modulos.domicilios ? '<div class="card"><header><h3>Domicilios</h3></header><div class="b"><div id="f3"></div></div></div>' : ''}`;
+  const e = POS.empresa;
+  const f1 = formulario($('f1'), [{ k: 'nombre', l: 'Nombre comercial', req: 1 }, { k: 'razonSocial', l: 'Razón social' }, { k: 'idFiscal', l: POS.pais.nombreIdFiscal }, { k: 'zonaHoraria', l: 'Zona horaria', t: 'lista', op: POS.pais.zonasHorarias }, { k: 'telefono', l: 'Teléfono' }, { k: 'correo', l: 'Correo' }, { k: 'direccion', l: 'Dirección' }, { k: 'ciudad', l: 'Ciudad' }, { k: 'logoUrl', l: 'Logo (https)' }, { k: 'color', l: 'Color de la tienda en línea', t: 'color' }], e);
+  const f2 = formulario($('f2'), [{ k: 'pos.descuentoMaxCajero', l: 'Descuento máximo del cajero (%)', t: 'numero' }, { k: 'pos.pieTicket', l: 'Mensaje al final del tiquete' }, { k: 'pos.permitirStockNegativo', l: 'Permitir vender sin existencias', t: 'si' }, { k: 'pos.redondearEfectivo', l: `Redondear efectivo a ${dinero(POS.pais.redondeoEfectivo)}`, t: 'si' }, { k: 'pos.arqueoCiego', l: 'Arqueo ciego (el cajero no ve lo esperado)', t: 'si' }, { k: 'pos.contenidoEtiqueta', l: 'La etiqueta de báscula trae', t: 'lista', op: [['peso', 'El peso'], ['precio', 'El precio']] }, { k: 'prefijos', l: 'Prefijos de etiqueta de báscula', ayuda: 'Separados por coma, por ejemplo 20, 21' }], { ...e, prefijos: (e.pos.prefijosBascula || []).join(', ') });
+  const f3 = $('f3') && formulario($('f3'), [{ k: 'domicilios.minutosPreparacion', l: 'Minutos de preparación', t: 'numero' }, { k: 'domicilios.recogerEnTienda', l: 'Permitir recoger en la tienda', t: 'si' }], e);
+  $('s').onclick = async () => { const a = f1.validar(); if (!a) return; const b = f2.tomar(); b.pos.prefijosBascula = b.prefijos.split(',').map(x => x.trim()).filter(x => /^2\d$/.test(x)); delete b.prefijos; const r = await datos('/configuracion', 'PUT', { ...a, ...b, ...(f3 ? f3.tomar() : {}) }); if (r) { toast('Guardado'); POS.empresa = r; } };
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,30 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Katú POS</title>
+  <link rel="icon" href="../assets/img/favicon.ico">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Sora:wght@500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+  <link rel="stylesheet" href="pos-admin.css">
+</head>
+<body data-pagina="misiones">
+<main class="content"></main>
+<script src="../assets/js/motor.js"></script>
+<script src="pos-admin.js"></script>
+<script>
+(async function () {
+  if (!(await POS.listo)) return;
+
+  const [cats, prods] = await Promise.all([datos('/categorias'), datos('/productos?estado=activos&limite=2000')]);
+  const TP = { compras: 'Número de compras', monto: 'Monto acumulado', producto: 'Comprar un producto', categoria: 'Comprar de una categoría', domicilios: 'Pedir domicilios' }, CI = { semana: 'Cada semana', mes: 'Cada mes', unica: 'Una sola vez' };
+  crud({ ruta: '/misiones', titulo: 'Misiones', sub: 'Retos que el cliente ve en la app, la tienda y la caja.', nuevo: 'Nueva misión', icono: 'fa-bolt', clase: 'l',
+    columnas: [{ t: 'Misión', f: m => `<b><i class="fa-solid ${esc(m.icono)}" style="color:var(--primary);width:24px"></i>${esc(m.nombre)}</b><small>${esc(m.descripcion)}</small>` }, { t: 'Reto', f: m => `${TP[m.tipo]}<small>meta ${fnum(m.meta)}</small>` }, { t: 'Se repite', f: m => CI[m.ciclo] }, { t: 'Premio', n: 1, f: m => m.premioPuntos + ' pts' }, { t: 'Estado', f: m => si(m.activo, 'Activa', 'Inactiva') }],
+    campos: [{ k: 'nombre', l: 'Nombre', w: 8, req: 1 }, { k: 'icono', l: 'Ícono', t: 'lista', w: 4, op: ['fa-bolt', 'fa-rocket', 'fa-fire', 'fa-carrot', 'fa-motorcycle', 'fa-star', 'fa-trophy', 'fa-gem', 'fa-heart', 'fa-sun'].map(i => [i, i.slice(3)]) }, { k: 'descripcion', l: 'Descripción', w: 12 }, { k: 'tipo', l: 'Reto', t: 'lista', w: 4, op: Object.entries(TP) }, { k: 'prod', l: 'Producto', t: 'lista', w: 4, op: prods.items.map(p => [p._id, p.nombre]), si: o => o.tipo === 'producto' }, { k: 'cat', l: 'Categoría', t: 'lista', w: 4, op: cats.map(c => [c._id, c.nombre]), si: o => o.tipo === 'categoria' }, { k: 'meta', l: 'Meta', t: 'numero', w: 4, def: 3 }, { k: 'ciclo', l: 'Se repite', t: 'lista', w: 4, op: Object.entries(CI) }, { k: 'premioPuntos', l: 'Puntos de premio', t: 'numero', w: 4, def: 50 }, { k: 'desde', l: 'Desde', t: 'fecha', w: 4 }, { k: 'hasta', l: 'Hasta', t: 'fecha', w: 4 }, { k: 'activo', l: 'Activa', t: 'si', def: true }],
+    alAbrir: (x, f, fm) => { if (f?.objetivo) { fm.campo('prod').value = f.objetivo; fm.campo('cat').value = f.objetivo; } },
+    preparar: o => { o.objetivo = o.tipo === 'producto' ? o.prod : o.tipo === 'categoria' ? o.cat : null; delete o.prod; delete o.cat; return o; } }).cargar();
+})();
+</script>
+</body>
+</html>

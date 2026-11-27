@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Katú POS</title>
+  <link rel="icon" href="../assets/img/favicon.ico">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Sora:wght@500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+  <link rel="stylesheet" href="pos-admin.css">
+</head>
+<body data-pagina="productos">
+<main class="content"></main>
+<script src="../assets/js/motor.js"></script>
+<script src="pos-admin.js"></script>
+<script>
+(async function () {
+  if (!(await POS.listo)) return;
+
+  const [cats, provs] = await Promise.all([datos('/categorias'), api('/proveedores').then(r => r.data || [])]);
+  const edita = POS.esSuper || ['admin', 'bodega'].includes(POS.user.rol);
+  document.querySelector('main').innerHTML = `<div class="head"><div><h1>Productos</h1><p id="res"></p></div><div class="acts">${edita ? '<button class="btn" id="imp"><i class="fa-solid fa-file-import"></i> Importar</button><button class="btn" id="exp"><i class="fa-solid fa-file-excel"></i> Exportar</button><button class="btn p" id="nv"><i class="fa-solid fa-plus"></i> Nuevo producto</button>' : ''}</div></div><div class="filtros"><div class="f g"><input class="in" id="q" placeholder="Nombre, marca, código o PLU"></div><div class="f"><select class="in" id="ct"><option value="">Todas las categorías</option>${cats.map(c => `<option value="${c._id}">${esc(c.nombre)}</option>`).join('')}</select></div><div class="f"><select class="in" id="es"><option value="">Todos</option><option value="activos" selected>Activos</option><option value="inactivos">Inactivos</option></select></div></div><div class="card"><div id="t"></div><div class="pag" id="pg"></div></div>`;
+  let pagina = 1;
+  async function cargar() {
+    const d = await datos(`/productos?q=${encodeURIComponent($('q').value)}&categoria=${$('ct').value}&estado=${$('es').value}&pagina=${pagina}`); if (!d) return;
+    $('res').textContent = `${fnum(d.total)} productos`;
+    tabla($('t'), [{ t: 'Producto', f: p => `<b>${esc(p.nombre)}</b><small>${esc([p.codigo, p.plu && 'PLU ' + p.plu, p.marca].filter(Boolean).join(' · '))}</small>` }, { t: 'Categoría', f: p => p.categoria ? `<span class="bd"><i class="fa-solid ${esc(p.categoria.icono)}" style="color:${esc(p.categoria.color)}"></i> ${esc(p.categoria.nombre)}</span>` : '—' }, { t: 'Tipo', f: p => ({ unidad: 'Unidad', peso: 'Por peso', combo: 'Combo', servicio: 'Servicio' }[p.tipo]) }, { t: 'Impuesto', f: p => esc(POS.pais.impuestos.find(i => i.codigo === p.impuesto)?.nombre || POS.pais.impuestos.find(i => i.codigo === POS.pais.impuestoDefecto)?.nombre || '') }, { t: 'Costo', n: 1, f: p => dinero(p.costo) }, { t: 'Precio', n: 1, f: p => `<b>${dinero(p.precio)}</b>${p.tipo === 'peso' ? `<small>por ${p.unidad}</small>` : ''}` }, { t: 'Existencia', n: 1, f: p => p.manejaInventario ? `<span class="bd ${p.existencia <= 0 ? 'mal' : p.existencia <= p.minimo ? 'av' : 'ok'}">${fnum(p.existencia)}</span>` : '—' }, { t: '', f: p => `${p.favorito ? '<i class="fa-solid fa-star" style="color:var(--warning)" title="Rápido en caja"></i> ' : ''}${p.enLinea ? '<i class="fa-solid fa-globe" style="color:var(--primary)" title="En tienda en línea"></i> ' : ''}${p.activo ? '' : si(false)}` }], d.items, { vacio: 'No hay productos con esta búsqueda', icono: 'fa-box', clic: edita ? abrir : null });
+    const ps = Math.max(1, Math.ceil(d.total / d.limite)); $('pg').innerHTML = `Página ${pagina} de ${ps} <button class="btn sm" id="a" ${pagina <= 1 ? 'disabled' : ''}>Anterior</button><button class="btn sm" id="b" ${pagina >= ps ? 'disabled' : ''}>Siguiente</button>`; $('a').onclick = () => { pagina--; cargar(); }; $('b').onclick = () => { pagina++; cargar(); };
+  }
+  function abrir(p) {
+    const m = modal({ clase: 'l', titulo: p ? 'Editar producto' : 'Nuevo producto', html: '<div id="f"></div><div id="px"></div><div id="cx"></div>', pie: `${p && (POS.esSuper || POS.user.rol === 'admin') ? '<button class="btn d" data-b style="margin-right:auto">Eliminar</button>' : ''}<button class="btn p" data-s>Guardar</button>` });
+    const f = formulario(m.q('#f'), [{ k: 'nombre', l: 'Nombre', w: 8, req: 1 }, { k: 'tipo', l: 'Se vende', t: 'lista', w: 4, op: [['unidad', 'Por unidad'], ['peso', 'Por peso (báscula)'], ['combo', 'Combo'], ['servicio', 'Servicio']] }, { k: 'codigo', l: 'Código de barras', w: 4, ayuda: 'Escanéalo con el cursor aquí' }, { k: 'plu', l: 'PLU (máx. 5 dígitos)', w: 4, ayuda: 'Para balanza etiquetadora y teclado' }, { k: 'categoria', l: 'Categoría', t: 'lista', w: 4, vacio: 'Sin categoría', op: cats.map(c => [c._id, c.nombre]) }, { k: 'precio', l: 'Precio con impuesto', t: 'dinero', w: 4, req: 1 }, { k: 'costo', l: 'Costo', t: 'dinero', w: 4, ayuda: 'Se promedia solo con cada compra' }, { k: 'impuesto', l: 'Impuesto', t: 'lista', w: 4, op: POS.pais.impuestos.map(i => [i.codigo, i.nombre]), def: POS.pais.impuestoDefecto }, { k: 'marca', l: 'Marca', w: 4 }, { k: 'unidad', l: 'Unidad de medida', t: 'lista', w: 4, op: [['und', 'Unidad'], ['kg', 'Kilogramo'], ['lt', 'Litro'], ['m', 'Metro']] }, { k: 'proveedor', l: 'Proveedor', t: 'lista', w: 4, vacio: 'Sin proveedor', op: provs.map(x => [x._id, x.nombre]) }, { k: 'minimo', l: 'Existencia mínima', t: 'numero', w: 4 }, { k: 'imagenUrl', l: 'Imagen (https)', w: 8 }, { k: 'descripcion', l: 'Descripción para la tienda en línea', t: 'area' }, { k: 'manejaInventario', l: 'Controlar inventario', t: 'si', w: 4, def: true, si: o => !['combo', 'servicio'].includes(o.tipo) }, { k: 'manejaVencimiento', l: 'Maneja vencimiento', t: 'si', w: 4, si: o => !['combo', 'servicio'].includes(o.tipo) }, { k: 'favorito', l: 'Tecla rápida en caja', t: 'si', w: 4 }, { k: 'enLinea', l: 'Vender en línea', t: 'si', w: 4, def: true }, { k: 'activo', l: 'Activo', t: 'si', w: 4, def: true }], p || {});
+    let pres = (p?.presentaciones || []).map(x => ({ ...x })), comp = [];
+    const px = m.q('#px'), cx = m.q('#cx');
+    const pintarP = () => { px.innerHTML = `<div class="sec" style="margin:18px 0 12px;padding-top:14px">Presentaciones con código propio (six-pack, caja…)</div>${pres.map((x, i) => `<div class="lin" style="grid-template-columns:1.4fr 1.4fr .8fr 1fr auto"><input class="in" placeholder="Nombre" data-i="${i}" data-k="nombre" value="${esc(x.nombre)}"><input class="in" placeholder="Código" data-i="${i}" data-k="codigo" value="${esc(x.codigo || '')}"><input class="in" type="number" step="any" placeholder="Unidades" data-i="${i}" data-k="factor" value="${x.factor || ''}"><input class="in" type="number" step="any" placeholder="Precio" data-i="${i}" data-k="precio" value="${x.precio ?? ''}"><button class="ib d" data-q="${i}" type="button"><i class="fa-solid fa-trash"></i></button></div>`).join('')}<button class="btn sm" type="button" data-n><i class="fa-solid fa-plus"></i> Agregar presentación</button>`; px.hidden = f.tomar().tipo !== 'unidad'; };
+    const pintarC = () => { cx.innerHTML = `<div class="sec" style="margin:18px 0 12px;padding-top:14px">Componentes del combo</div>${comp.map((x, i) => `<div class="lin" style="grid-template-columns:2fr .7fr auto"><input class="in" disabled value="${esc(x.nombre || x.producto)}"><input class="in" type="number" step="any" data-ci="${i}" value="${x.cantidad}"><button class="ib d" data-cq="${i}" type="button"><i class="fa-solid fa-trash"></i></button></div>`).join('')}<input class="in" id="cb" placeholder="Buscar producto para agregar">`; buscarProducto(cx.querySelector('#cb'), x => { comp.push({ producto: x._id, nombre: x.nombre, cantidad: 1 }); pintarC(); }); cx.hidden = f.tomar().tipo !== 'combo'; };
+    px.oninput = e => { const i = e.target.dataset.i; if (i !== undefined) pres[i][e.target.dataset.k] = e.target.value; };
+    px.onclick = e => { const q = e.target.closest('[data-q]'); if (q) pres.splice(Number(q.dataset.q), 1); else if (e.target.closest('[data-n]')) pres.push({ nombre: '', codigo: '', factor: 6 }); else return; pintarP(); };
+    cx.oninput = e => { if (e.target.dataset.ci !== undefined) comp[e.target.dataset.ci].cantidad = Number(e.target.value); };
+    cx.onclick = e => { const q = e.target.closest('[data-cq]'); if (q) { comp.splice(Number(q.dataset.cq), 1); pintarC(); } };
+    f.campo('tipo').addEventListener('change', () => { pintarP(); pintarC(); }); pintarP(); pintarC();
+    if (p?.componentes?.length) (async () => { const d = await datos('/productos?limite=2000'); comp = p.componentes.map(c => ({ ...c, nombre: d?.items.find(x => x._id === c.producto)?.nombre })); pintarC(); })();
+    m.q('[data-b]')?.addEventListener('click', async () => { if (await confirmar('Eliminar producto', 'Solo se puede si nunca se ha vendido.') && await datos('/productos/' + p._id, 'DELETE')) { m.cerrar(); cargar(); } });
+    m.q('[data-s]').onclick = async () => { const o = f.validar(); if (!o) return; if (!(o.precio > 0) && !await confirmar('Precio en cero', '¿Guardar el producto sin precio?', 'Guardar')) return; const r = await datos('/productos' + (p ? '/' + p._id : ''), p ? 'PUT' : 'POST', { ...o, presentaciones: o.tipo === 'unidad' ? pres.map(x => ({ ...x, factor: Number(x.factor), precio: Number(x.precio) })) : [], componentes: o.tipo === 'combo' ? comp.map(c => ({ producto: c.producto, cantidad: c.cantidad })) : [] }); if (r) { m.cerrar(); toast('Guardado'); cargar(); } };
+  }
+  if (edita) {
+    $('nv').onclick = () => abrir(null); $('exp').onclick = () => descargar('/productos/exportar', 'productos.xlsx');
+    $('imp').onclick = () => { const m = modal({ clase: 's', titulo: 'Importar productos', html: `<p style="color:var(--muted);line-height:1.6;margin-bottom:14px">Usa el mismo formato del Excel exportado: Codigo, PLU, Nombre, Categoria, Marca, Tipo, Precio, Costo, Impuesto, Minimo. Si el código ya existe, se actualiza.</p><input type="file" class="in" accept=".xlsx,.xls,.csv" style="padding:8px"><div id="r" style="margin-top:14px"></div>`, pie: '<button class="btn p" data-s>Importar</button>' }); m.q('[data-s]').onclick = async e => { const a = m.q('input').files[0]; if (!a) return toast('Elige el archivo', 'mal'); const fd = new FormData(); fd.append('archivo', a); e.target.disabled = true; const r = await datos('/productos/importar', 'POST', fd); e.target.disabled = false; if (!r) return; m.q('#r').innerHTML = `<div class="aviso b">${r.creados} creados · ${r.actualizados} actualizados</div>${r.errores.length ? `<div class="aviso m" style="margin-top:8px;display:block">${r.errores.slice(0, 12).map(x => `Fila ${x.fila}: ${esc(x.error)}`).join('<br>')}</div>` : ''}`; cargar(); }; };
+  }
+  ['ct', 'es'].forEach(i => { $(i).onchange = () => { pagina = 1; cargar(); }; }); let t; $('q').oninput = () => { clearTimeout(t); t = setTimeout(() => { pagina = 1; cargar(); }, 250); };
+  cargar();
+})();
+</script>
+</body>
+</html>

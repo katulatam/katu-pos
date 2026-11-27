@@ -1,0 +1,37 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Katú POS</title>
+  <link rel="icon" href="../assets/img/favicon.ico">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Sora:wght@500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+  <link rel="stylesheet" href="pos-admin.css">
+</head>
+<body data-pagina="reportes">
+<main class="content"></main>
+<script src="../assets/js/motor.js"></script>
+<script src="pos-admin.js"></script>
+<script>
+(async function () {
+  if (!(await POS.listo)) return;
+
+  document.querySelector('main').innerHTML = `<div class="head"><div><h1>Informes</h1><p>Ventas, márgenes e impuestos del período.</p></div></div><div class="filtros" id="rg"></div><div class="kpis" id="k"></div><div class="card"><header><h3>Ventas por día</h3></header><div class="b" id="g1"></div></div><div class="mitad"><div class="card"><header><h3>Categorías</h3></header><div class="b" id="g2"></div></div><div class="card"><header><h3>Medios de pago</h3></header><div class="b" id="g3"></div></div></div><div class="mitad"><div class="card"><header><h3>Cajeros</h3></header><div id="t2"></div></div><div class="card"><header><h3>Impuestos</h3></header><div id="t3"></div></div></div><div class="card"><header><h3>Rentabilidad por producto</h3></header><div id="t1"></div></div>`;
+  const rg = rango($('rg'), () => cargar(), 6);
+  async function cargar() {
+    const d = await datos('/reportes/ventas?' + rg()); if (!d) return; const r = d.resumen, u = r.base - r.costo;
+    $('k').innerHTML = [['Ventas', dinero(r.total), `${fnum(r.n)} transacciones`], ['Promedio por venta', dinero(r.n ? r.total / r.n : 0), `${r.n ? Math.round(r.conCliente * 100 / r.n) : 0}% con cliente`], ['Utilidad estimada', dinero(u), `Margen ${fnum(r.base ? u * 100 / r.base : 0, 1)}%`], ['Impuestos', dinero(r.impuesto), `Base ${dinero(r.base)}`], ['Ahorro a clientes', dinero(r.descuento), 'Promociones y descuentos']].map(x => `<div class="kpi"><div class="k">${x[0]}</div><div class="v">${x[1]}</div><div class="s">${x[2]}</div></div>`).join('');
+    const dia = f => new Date(f + 'T12:00:00Z').toLocaleDateString(POS.pais.locale, { timeZone: 'UTC', day: 'numeric', month: 'short' });
+    barras($('g1'), d.dias, { etiqueta: x => dia(x._id), valor: x => x.total, tip: x => [dia(x._id), dinero(x.total), x.n + ' ventas'], cada: Math.ceil(d.dias.length / 12) });
+    barrasH($('g2'), d.categorias, { nombre: x => x.nombre, valor: x => x.total, texto: x => dinero(x.total) });
+    barrasH($('g3'), d.medios, { nombre: x => x._id, valor: x => x.total, texto: x => dinero(x.total) });
+    tabla($('t2'), [{ t: 'Cajero', f: x => esc(x.nombre) }, { t: 'Ventas', n: 1, f: x => fnum(x.n) }, { t: 'Total', n: 1, f: x => dinero(x.total) }], d.cajeros);
+    tabla($('t3'), [{ t: 'Tarifa', f: x => x._id.tipo === 'excluido' ? 'Excluido' : `${String(x._id.tipo).toUpperCase()} ${x._id.pct}%` }, { t: 'Base', n: 1, f: x => dinero(x.base) }, { t: 'Impuesto', n: 1, f: x => dinero(x.impuesto) }], d.impuestos);
+    tabla($('t1'), [{ t: 'Producto', f: x => esc(x.nombre) }, { t: 'Cantidad', n: 1, f: x => fnum(x.cantidad) }, { t: 'Ventas', n: 1, f: x => dinero(x.total) }, { t: 'Utilidad', n: 1, f: x => dinero(x.base - x.costo) }, { t: 'Margen', n: 1, f: x => x.base ? fnum((x.base - x.costo) * 100 / x.base, 1) + '%' : '—' }], d.productos);
+  }
+  cargar();
+})();
+</script>
+</body>
+</html>

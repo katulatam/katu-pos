@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html lang="es" data-tema="oscuro">
+<head>
+  <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Crea tu contraseña — Katú POS</title>
+  <link rel="icon" href="../assets/img/favicon.ico">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Sora:wght@500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+  <link rel="stylesheet" href="pos-admin.css">
+</head>
+<body>
+<main class="entrada"><form class="modal" id="f">
+  <div class="sb-logo" style="padding:0;font-size:22px"><i class="fa-solid fa-bolt"></i><div>Katú <span>POS</span></div></div>
+  <h2 style="font-family:var(--titulo);font-size:20px" id="tit">Crea tu contraseña</h2>
+  <p style="color:var(--muted);font-size:13.5px;line-height:1.5" id="sub">Con ella entrarás a tu panel, a la caja y a la app.</p>
+  <div class="f"><label for="p1">Contraseña nueva (mínimo 8 caracteres)</label><input class="in" id="p1" type="password" autocomplete="new-password" minlength="8" required></div>
+  <div class="f"><label for="p2">Repítela</label><input class="in" id="p2" type="password" autocomplete="new-password" minlength="8" required></div>
+  <div class="aviso m" id="e" hidden></div>
+  <button class="btn p" style="height:46px">Guardar y entrar</button>
+</form></main>
+<script>
+  const q = new URLSearchParams(location.search), token = q.get('t'), e = document.getElementById('e');
+  const mal = t => { e.textContent = t; e.hidden = false; };
+  if (q.get('r')) { document.getElementById('tit').textContent = 'Crea una contraseña nueva'; document.getElementById('sub').textContent = 'La anterior dejará de funcionar.'; }
+  if (!token) mal('El enlace está incompleto. Ábrelo de nuevo desde tu correo.');
+  document.getElementById('f').onsubmit = async ev => {
+    ev.preventDefault(); e.hidden = true;
+    if (p1.value !== p2.value) return mal('Las contraseñas no coinciden');
+    const r = await fetch('/api/v1/auth/crear-clave', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ token, password: p1.value }) }).then(x => x.json()).catch(() => ({ error: 'No hay conexión con el servidor' }));
+    if (!r.success) return mal(r.error);
+    // Entra de una vez con la contraseña nueva
+    const l = await fetch('/api/v1/auth/login', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ correo: r.data.correo, password: p1.value }) }).then(x => x.json()).catch(() => ({}));
+    if (!l.success) return location.replace('index.html');
+    const rol = l.data.user.rol;
+    if (rol === 'cajero') { localStorage.setItem('katu_pos_token', l.data.token); localStorage.setItem('katu_pos_user', JSON.stringify(l.data.user)); return location.replace('/pos/'); }
+    if (rol === 'domiciliario') { localStorage.setItem('katu_domi_token', l.data.token); return location.replace('/domiciliario/'); }
+    localStorage.setItem('katu_admin_token', l.data.token); localStorage.setItem('katu_admin_user', JSON.stringify(l.data.user));
+    location.replace(rol === 'asesor' ? 'whatsapp.html' : rol === 'bodega' ? 'inventario.html' : 'dashboard.html');
+  };
+</script>
+</body>
+</html>

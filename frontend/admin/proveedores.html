@@ -1,0 +1,26 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Katú POS</title>
+  <link rel="icon" href="../assets/img/favicon.ico">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Sora:wght@500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+  <link rel="stylesheet" href="pos-admin.css">
+</head>
+<body data-pagina="proveedores">
+<main class="content"></main>
+<script src="../assets/js/motor.js"></script>
+<script src="pos-admin.js"></script>
+<script>
+(async function () {
+  if (!(await POS.listo)) return;
+
+  crud({ ruta: '/proveedores', titulo: 'Proveedores', sub: 'Los días de entrega alimentan la sugerencia de reabastecimiento.', nuevo: 'Nuevo proveedor', buscar: true, icono: 'fa-handshake-angle',
+    columnas: [{ t: 'Proveedor', f: p => `<b>${esc(p.nombre)}</b><small>${esc(p.documento)}</small>` }, { t: 'Contacto', f: p => `${esc(p.contacto)}<small>${esc([p.telefono, p.correo].filter(Boolean).join(' · '))}</small>` }, { t: 'Entrega', n: 1, f: p => p.diasEntrega + ' días' }, { t: 'Estado', f: p => si(p.activo) }],
+    campos: [{ k: 'nombre', l: 'Nombre', req: 1 }, { k: 'documento', l: POS.pais.nombreIdFiscal }, { k: 'contacto', l: 'Contacto' }, { k: 'telefono', l: 'Teléfono' }, { k: 'correo', l: 'Correo' }, { k: 'diasEntrega', l: 'Días de entrega', t: 'numero', def: 3 }, { k: 'activo', l: 'Activo', t: 'si', def: true }] }).cargar();
+})();
+</script>
+</body>
+</html>

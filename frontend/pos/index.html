@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <title>Ingreso — Katú POS</title>
+  <meta name="theme-color" content="#EEF2F7"><link rel="manifest" href="manifest.webmanifest">
+  <link rel="icon" href="../assets/img/favicon.ico">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Sora:wght@500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+  <link rel="stylesheet" href="pos.css">
+</head>
+<body>
+<main class="entrada">
+  <div class="vent" id="caja1">
+    <div class="c" style="padding:30px 28px;gap:18px">
+      <div class="marca" style="font-size:22px"><i class="fa-solid fa-bolt"></i><b>Katú <span>POS</span></b></div>
+      <form id="fLogin" style="display:flex;flex-direction:column;gap:14px">
+        <div><label class="k" for="correo">Correo</label><input class="in" id="correo" type="email" autocomplete="username" required></div>
+        <div><label class="k" for="clave">Contraseña</label><input class="in" id="clave" type="password" autocomplete="current-password" required></div>
+        <p class="nota mal" id="err" hidden></p>
+        <button class="b1">Ingresar</button>
+      </form>
+    </div>
+  </div>
+  <div class="vent l" id="caja2" hidden>
+    <header><span>Elige tu caja</span><button class="ico" id="btnSalir" title="Cerrar sesión"><i class="fa-solid fa-right-from-bracket"></i></button></header>
+    <div class="c"><div class="cajas" id="cajas"></div><p class="nota" id="aviso"></p></div>
+  </div>
+</main>
+<script src="../assets/js/motor.js"></script><script src="base.js"></script>
+<script>
+  const aCaja = (id, tipo) => { localStorage.setItem('katu_pos_caja', id); location.href = tipo === 'autopago' ? 'autopago.html' : 'caja.html'; };
+  async function cajas() {
+    $('caja1').hidden = true; $('caja2').hidden = false;
+    const d = await api('/pos/cajas');
+    if (d.http === 401) return sesion.salir();
+    if (!d.success) {
+      const ult = localStorage.getItem('katu_pos_caja');
+      $('aviso').textContent = d.error;
+      if (d.red && ult && await bd.leer('arranque:' + ult)) { $('cajas').innerHTML = `<button class="tarj" id="off"><b>Seguir sin conexión</b><small>Se usa la última caja abierta en este equipo. Las ventas se sincronizan al volver internet.</small></button>`; $('off').onclick = () => aCaja(ult); }
+      return;
+    }
+    $('cajas').innerHTML = d.data.map(c => { const ocupada = c.turno && !c.turno.mio && sesion.user.rol === 'cajero'; return `<button class="tarj" data-id="${c._id}" data-tipo="${esc(c.tipo || 'caja')}" ${ocupada ? 'disabled' : ''}><b>${c.tipo === 'autopago' ? '<i class="fa-solid fa-barcode" style="color:var(--cian)"></i> ' : ''}${esc(c.nombre)}</b><small>${esc(c.sede)}<br>${c.turno ? (c.turno.mio ? 'Tu turno está abierto' : 'Turno de ' + esc(c.turno.cajero)) : 'Disponible'}</small></button>`; }).join('') || '<p class="nota">No hay cajas configuradas para tu sede.</p>';
+    document.querySelectorAll('.tarj').forEach(b => { b.onclick = () => aCaja(b.dataset.id, b.dataset.tipo); });
+  }
+  $('fLogin').onsubmit = async e => {
+    e.preventDefault(); $('err').hidden = true;
+    const d = await api('/auth/login', { metodo: 'POST', body: { correo: $('correo').value, password: $('clave').value } });
+    const mal = m => { $('err').textContent = m; $('err').hidden = false; };
+    if (!d.success) return mal(d.error);
+    if (!['admin', 'supervisor', 'cajero'].includes(d.data.user.rol)) return mal('Esta cuenta no tiene acceso a la caja');
+    sesion.guardar(d.data); cajas();
+  };
+  $('btnSalir').onclick = () => sesion.salir();
+  if (sesion.token) cajas();
+</script>
+</body>
+</html>

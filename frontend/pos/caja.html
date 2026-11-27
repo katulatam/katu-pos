@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <title>Caja — Katú POS</title>
+  <meta name="theme-color" content="#EEF2F7"><link rel="manifest" href="manifest.webmanifest">
+  <link rel="icon" href="../assets/img/favicon.ico">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Sora:wght@500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+  <link rel="stylesheet" href="pos.css">
+</head>
+<body>
+<div class="cabina" id="cabina" hidden>
+  <header class="panel barra">
+    <div class="marca"><i class="fa-solid fa-bolt"></i><b>Katú <span>POS</span></b></div>
+    <div class="donde"><b id="dEmpresa"></b><span id="dCaja"></span></div>
+    <div class="sep"></div>
+    <button class="balanza" id="balanza" hidden title="Báscula (F9)"><i class="fa-solid fa-weight-scale"></i><span class="kg" id="bKg">— — —</span><small>kg</small></button>
+    <button class="pastilla" id="red"><span class="pt"></span><span class="tx">En línea</span></button>
+    <button class="ico" id="bPedidos" title="Domicilios" hidden><i class="fa-solid fa-motorcycle"></i></button>
+    <button class="ico" id="bTema" title="Tema oscuro"><i class="fa-solid fa-moon"></i></button>
+    <button class="ico oc" id="bLiga" title="Liga de cajeros"><i class="fa-solid fa-trophy"></i></button>
+    <button class="ico" id="bMenu" title="Menú"><i class="fa-solid fa-bars"></i></button>
+  </header>
+  <nav class="panel riel" id="riel" aria-label="Categorías"></nav>
+  <section class="centro">
+    <div class="panel buscar"><i class="fa-solid fa-barcode"></i><input id="buscar" placeholder="Escanea o busca por nombre, código o PLU" autocomplete="off" spellcheck="false" aria-label="Buscar producto"><kbd class="oc">F2</kbd></div>
+    <div class="rejilla" id="rejilla"></div>
+  </section>
+  <aside class="panel tiquete" id="tiquete">
+    <button class="cli" id="cli"></button>
+    <div class="lineas" id="lineas"></div>
+    <div class="tot">
+      <div id="filas"></div>
+      <div class="g" id="gran"><span id="nArt">Total</span><b class="num" id="total">0</b></div>
+      <div class="acc">
+        <button class="b2" id="bDesc"><i class="fa-solid fa-percent"></i> Descuento</button>
+        <button class="b2" id="bEspera"><i class="fa-solid fa-pause"></i> Espera</button>
+        <button class="b2 peligro" id="bVaciar"><i class="fa-solid fa-trash"></i> Vaciar</button>
+      </div>
+      <button class="b1" id="bCobrar">Cobrar <kbd class="oc">F12</kbd></button>
+    </div>
+  </aside>
+</div>
+<script src="../assets/js/motor.js"></script><script src="../assets/js/bascula.js"></script>
+<script src="base.js"></script><script src="equipos.js"></script><script src="caja.js"></script>
+</body>
+</html>

@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <title>Katú</title>
+  <link rel="icon" href="/assets/img/favicon.ico">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Sora:wght@600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
+  <link rel="stylesheet" href="/tienda/tienda.css">
+</head>
+<body>
+<header class="cab"><div><a class="pill" id="vo" aria-label="Volver a la tienda"><i class="fa-solid fa-store"></i></a><div class="sp"><h1 id="nm">Tu pedido</h1></div></div></header><main id="m" style="max-width:680px"></main>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+<script src="/assets/js/motor.js"></script><script src="/tienda/tienda.js"></script>
+<script>
+(async function () {
+  const tk = location.pathname.split('/').pop(); let d = null, mapa = null, mk = [], cobro = null, t = null;
+  const PA = ['recibido', 'preparando', 'listo', 'en_camino', 'entregado'];
+  const TX = { recibido: ['Recibimos tu pedido', 'La tienda lo está revisando.'], preparando: ['Estamos preparando tu pedido', 'Alistando cada producto.'], listo: ['Tu pedido está listo', 'Esperando al domiciliario.'], en_camino: ['Tu pedido va en camino', 'Ten a la mano tu PIN de entrega.'], entregado: ['¡Entregado!', 'Gracias por tu compra.'], cancelado: ['Pedido cancelado', ''] };
+  const din = n => Motor.dinero(n, d.pais);
+  async function cargar() {
+    const r = await api('/publico/seguimiento/' + tk); if (!r.success) { if (!d) $('m').innerHTML = `<div class="caja" style="text-align:center;padding:50px">${esc(r.error)}</div>`; return; }
+    const antes = d ? JSON.stringify([d.estado, d.pagado, d.total, d.porPesar, d.calificado]) : ''; d = r.data;
+    if (antes !== JSON.stringify([d.estado, d.pagado, d.total, d.porPesar, d.calificado])) pintar(); posicion();
+    if (['entregado', 'cancelado'].includes(d.estado)) clearInterval(t);
+  }
+  function pintar() {
+    if (/^#[0-9a-f]{6}$/i.test(d.empresa.color || '') && d.empresa.color.toLowerCase() !== '#05c3dd') document.documentElement.style.setProperty('--c', d.empresa.color);
+    $('vo').href = '/t/' + d.empresa.slug; $('nm').textContent = `${d.empresa.nombre} · ${d.numero}`;
+    const i = PA.indexOf(d.estado), x = TX[d.estado]; mapa = null; mk = [];
+    $('m').innerHTML = `<section class="caja"><h2 style="margin:0">${d.tipo === 'recoger' && d.estado === 'listo' ? 'Pasa por tu pedido' : x[0]}</h2><p style="color:var(--t2);margin-top:6px">${d.estado === 'cancelado' ? esc(d.motivoCancelacion || '') : d.tipo === 'recoger' && d.estado === 'listo' ? esc([d.sede.nombre, d.sede.direccion].filter(Boolean).join(', ')) : x[1]}</p>${d.estado !== 'cancelado' ? `<div class="pasos">${PA.slice(0, 4).map((p, k) => `<div class="${k < i || d.estado === 'entregado' ? 'on' : k === i ? 'on ah' : ''}"></div>`).join('')}</div>${d.estado !== 'entregado' ? `<p style="font-size:14px;color:var(--t2)">Hora estimada: <b>${new Date(new Date(d.creado).getTime() + d.minutos * 60000).toLocaleTimeString(d.pais.locale, { hour: '2-digit', minute: '2-digit' })}</b></p>` : ''}` : ''}</section>
+    ${d.pin ? `<section class="caja" style="text-align:center"><h3 style="justify-content:center"><i class="fa-solid fa-key"></i>PIN de entrega</h3><div class="pin">${esc(d.pin)}</div><p style="font-size:13px;color:var(--t2)">Dáselo al domiciliario solo cuando recibas el pedido.</p></section>` : ''}
+    ${d.puedePagar ? '<section class="caja" id="pg"><h3><i class="fa-solid fa-qrcode"></i>Pago</h3><button class="bt" id="pa">Pagar ' + din(d.total) + '</button></section>' : d.porPesar && !d.pagado && d.estado !== 'cancelado' ? '<div class="av i"><i class="fa-solid fa-weight-scale"></i><span>Estamos pesando tus productos. El total puede variar un poco.</span></div>' : d.pagado ? '<div class="av b"><i class="fa-solid fa-circle-check"></i><span>Pago confirmado.</span></div>' : ''}
+    ${d.estado === 'en_camino' ? `<section class="caja"><h3><i class="fa-solid fa-motorcycle"></i>${esc(d.domiciliario?.nombre || 'Domiciliario')}</h3><p style="color:var(--t2);margin-bottom:12px">${esc(d.domiciliario?.vehiculo || '')} ${d.domiciliario?.telefono ? `<a href="tel:${esc(d.domiciliario.telefono)}">Llamar</a>` : ''}</p><div class="mapa" id="mp"></div></section>` : ''}
+    ${d.estado === 'entregado' && !d.calificado ? `<section class="caja" style="text-align:center"><h3 style="justify-content:center">¿Cómo estuvo?</h3><div class="est">${[1, 2, 3, 4, 5].map(n => `<button data-e="${n}" aria-label="${n} estrellas"><i class="fa-solid fa-star"></i></button>`).join('')}</div></section>` : ''}
+    <section class="caja"><h3><i class="fa-solid fa-receipt"></i>Detalle</h3>${d.items.map(p => `<div class="ln"><span class="d">${esc(p.nombre)}<small>${(p.cantidadReal ?? p.cantidad).toLocaleString(d.pais.locale)} ${p.porPeso ? p.unidad : ''}${p.porPeso && p.cantidadReal == null ? ' aprox.' : ''}</small></span><b>${din(p.total)}</b></div>`).join('')}<div class="fila" style="margin-top:10px"><span>Productos</span><span>${din(d.totalProductos)}</span></div>${d.tipo === 'domicilio' ? `<div class="fila"><span>Domicilio</span><span>${d.domicilio ? din(d.domicilio) : 'Gratis'}</span></div>` : ''}<div class="fila t"><span>Total</span><span>${din(d.total)}</span></div><p style="font-size:13.5px;color:var(--t2);margin-top:8px">${esc(d.medioPago)}${d.entrega ? ` · ${esc(d.entrega.direccion)}` : ''}</p></section>`;
+    if ($('pa')) $('pa').onclick = pagar;
+    document.querySelectorAll('[data-e]').forEach(b => { b.onclick = async () => { const r = await api(`/publico/seguimiento/${tk}/calificar`, 'POST', { estrellas: Number(b.dataset.e) }); toast(r.success ? '¡Gracias por calificar!' : r.error); cargar(); }; });
+  }
+  async function pagar(e) {
+    e.target.disabled = true; const r = await api(`/publico/seguimiento/${tk}/pagar`, 'POST', {}); if (!r.success) { e.target.disabled = false; return toast(r.error); }
+    cobro = r.data; if (cobro.estado === 'aprobado') return cargar();
+    $('pg').innerHTML = `<h3><i class="fa-solid fa-qrcode"></i>Paga ${din(cobro.monto)}</h3><div style="text-align:center">${cobro.qrBase64 ? `<img src="${esc(cobro.qrBase64)}" alt="QR de pago" style="width:min(260px,80%)">` : ''}${cobro.urlPago ? `<p style="margin-top:8px"><a class="pill" href="${esc(cobro.urlPago)}" target="_blank" rel="noopener">Abrir página de pago</a></p>` : ''}<p style="font-size:13px;color:var(--t2);margin-top:10px">Esperando la confirmación…</p></div>`;
+    const p = setInterval(async () => { const x = await api(`/publico/seguimiento/${tk}/pago/${cobro._id}`); if (!x.success || x.data.estado === 'pendiente') return; clearInterval(p); if (x.data.estado === 'aprobado') { toast('Pago confirmado'); cargar(); } else { toast('El pago no se completó. Puedes intentarlo de nuevo.'); pintar(); } }, 3000);
+  }
+  function posicion() { const e = $('mp'); if (!e || d.estado !== 'en_camino') return; if (!mapa) { mapa = L.map(e).setView([d.entrega.lat, d.entrega.lng], 15); L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19, attribution: '© OpenStreetMap' }).addTo(mapa); L.marker([d.entrega.lat, d.entrega.lng]).addTo(mapa); } mk.forEach(x => x.remove()); const u = d.domiciliario?.ubicacion; if (u) { mk = [L.circleMarker([u.lat, u.lng], { radius: 11, color: '#fff', weight: 3, fillColor: '#5A49E0', fillOpacity: 1 }).addTo(mapa)]; mapa.fitBounds([[u.lat, u.lng], [d.entrega.lat, d.entrega.lng]], { padding: [40, 40], maxZoom: 16 }); } }
+  await cargar(); t = setInterval(cargar, 6000);
+})();
+</script>
+</body>
+</html>

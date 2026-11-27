@@ -1,0 +1,11 @@
+**/node_modules
+**/.env
+**/.data
+mobile
+agente
+docs
+.git
+landing
+deploy
+backend/tests
+.claude

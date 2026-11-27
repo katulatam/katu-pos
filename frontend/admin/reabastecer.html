@@ -1,0 +1,32 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Katú POS</title>
+  <link rel="icon" href="../assets/img/favicon.ico">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Sora:wght@500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+  <link rel="stylesheet" href="pos-admin.css">
+</head>
+<body data-pagina="reabastecer">
+<main class="content"></main>
+<script src="../assets/js/motor.js"></script>
+<script src="pos-admin.js"></script>
+<script>
+(async function () {
+  if (!(await POS.listo)) return;
+
+  const sedes = await datos('/sedes') || [];
+  document.querySelector('main').innerHTML = `<div class="head"><div><h1>Reabastecer</h1><p>Qué pedir y cuánto, según el ritmo de venta de las últimas 4 semanas, los días de entrega del proveedor y lo que tienes disponible.</p></div><div class="acts"><button class="btn p" id="cp"><i class="fa-solid fa-cart-plus"></i> Pasar a compra</button></div></div><div class="filtros"><div class="f"><label>Sede</label><select class="in" id="sd"><option value="">Todas</option>${sedes.map(s => `<option value="${s._id}">${esc(s.nombre)}</option>`).join('')}</select></div><div class="f"><label>Días que debe durar</label><input class="in" type="number" id="cb" value="10" min="3" max="60"></div><div class="f g"><label>Proveedor</label><select class="in" id="pv"><option value="">Todos</option></select></div></div><div class="card" id="t"></div>`;
+  let l = [];
+  async function cargar() { l = await datos(`/inventario/reabastecer?sede=${$('sd').value}&cobertura=${$('cb').value}`) || []; const a = $('pv').value; $('pv').innerHTML = '<option value="">Todos</option>' + [...new Map(l.filter(x => x.proveedorId).map(x => [x.proveedorId, x.proveedor]))].map(([k, v]) => `<option value="${k}">${esc(v)}</option>`).join(''); $('pv').value = a; pintar(); }
+  const vis = () => l.filter(x => !$('pv').value || x.proveedorId === $('pv').value);
+  function pintar() { tabla($('t'), [{ t: '', f: x => `<input type="checkbox" data-c="${x._id}" checked>` }, { t: 'Producto', f: x => `<b>${esc(x.nombre)}</b><small>${esc(x.proveedor)}</small>` }, { t: 'Disponible', n: 1, f: x => fnum(x.disponible) }, { t: 'Vende al día', n: 1, f: x => `${fnum(x.ritmo, 2)}${x.tendencia != null && Math.abs(x.tendencia) >= 10 ? `<small class="${x.tendencia > 0 ? 'sube' : 'baja'}">${x.tendencia > 0 ? '▲' : '▼'} ${Math.abs(x.tendencia)}%</small>` : ''}` }, { t: 'Alcanza para', n: 1, f: x => x.dias == null ? '—' : `<span class="bd ${x.urgente ? 'mal' : x.dias < 7 ? 'av' : 'ok'}">${fnum(x.dias, 1)} días</span>` }, { t: 'Pedir', n: 1, f: x => `<b>${fnum(x.pedir)} ${x.unidad === 'und' ? '' : x.unidad}</b>` }, { t: 'Costo', n: 1, f: x => dinero(x.costo) }], vis(), { vacio: 'Todo está abastecido', icono: 'fa-circle-check' }); }
+  $('sd').onchange = $('cb').onchange = cargar; $('pv').onchange = pintar;
+  $('cp').onclick = async () => { const ids = new Set([...document.querySelectorAll('[data-c]:checked')].map(c => c.dataset.c)); const s = vis().filter(x => ids.has(x._id)); if (!s.length) return toast('Elige productos', 'mal'); const ps = await datos('/productos?limite=2000'); sessionStorage.setItem('katu_sugerido', JSON.stringify({ proveedor: $('pv').value, items: s.map(x => { const p = ps.items.find(y => y._id === x._id) || {}; return { producto: x._id, nombre: x.nombre, cantidad: x.pedir, costo: p.costo || 0, mv: p.manejaVencimiento }; }) })); location.href = 'compras.html'; };
+  cargar();
+})();
+</script>
+</body>
+</html>

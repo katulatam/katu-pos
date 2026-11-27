@@ -1,0 +1,17 @@
+{
+  "name": "katu-pos-agente",
+  "version": "1.0.0",
+  "description": "Agente local de equipos de Katú POS: báscula RS-232/USB, impresora térmica ESC/POS, y cajón monedero",
+  "main": "agente.js",
+  "scripts": {
+    "start": "node agente.js",
+    "simular": "node agente.js --simular",
+    "puertos": "node agente.js --puertos",
+    "test": "node --test"
+  },
+  "dependencies": {
+    "dotenv": "^16.6.1",
+    "serialport": "^13.0.0",
+    "ws": "^8.18.0"
+  }
+}

@@ -1,0 +1,34 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Katú POS</title>
+  <link rel="icon" href="../assets/img/favicon.ico">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Sora:wght@500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+  <link rel="stylesheet" href="pos-admin.css">
+</head>
+<body data-pagina="gamificacion">
+<main class="content"></main>
+<script src="../assets/js/motor.js"></script>
+<script src="pos-admin.js"></script>
+<script>
+(async function () {
+  if (!(await POS.listo)) return;
+
+  const g = JSON.parse(JSON.stringify(POS.empresa.gamificacion));
+  document.querySelector('main').innerHTML = `<div class="head"><div><h1>Reglas del juego</h1><p>Puntos, niveles, ruleta y meta de los cajeros.</p></div><div class="acts"><button class="btn p" id="s">Guardar cambios</button></div></div><div class="card"><header><h3>Puntos</h3></header><div class="b"><div id="f"></div><div class="aviso i"><i class="fa-solid fa-circle-info"></i><span id="ej"></span></div></div></div><div class="mitad"><div class="card"><header><h3>Niveles</h3><div class="r"><button class="btn sm" id="nn"><i class="fa-solid fa-plus"></i></button></div></header><div class="b" id="nv"></div></div><div class="card"><header><h3>Ruleta</h3><div class="r"><button class="btn sm" id="np"><i class="fa-solid fa-plus"></i></button></div></header><div class="b"><div id="fr"></div><div id="pr"></div></div></div></div>`;
+  const f = formulario($('f'), [{ k: 'montoPorPunto', l: 'Compra para ganar 1 punto', t: 'dinero', w: 4 }, { k: 'valorPunto', l: 'Un punto vale', t: 'dinero', w: 4 }, { k: 'minimoRedimir', l: 'Mínimo para redimir (puntos)', t: 'numero', w: 4 }, { k: 'maxPctRedimir', l: 'Máximo de la compra pagable (%)', t: 'numero', w: 4 }, { k: 'metaDiariaCajero', l: 'Meta diaria del cajero', t: 'dinero', w: 4 }], g);
+  const fr = formulario($('fr'), [{ k: 'activa', l: 'Ruleta activa', t: 'si' }, { k: 'compraMinima', l: 'Compra mínima para girar', t: 'dinero' }], g.ruleta);
+  const ej = () => { const o = f.tomar(); $('ej').textContent = `Devuelves el ${fnum(o.montoPorPunto ? o.valorPunto * 100 / o.montoPorPunto : 0, 2)}% de cada compra en puntos (antes del multiplicador de nivel). Los puntos redimidos salen como descuento en la factura.`; }; $('f').addEventListener('input', ej); ej();
+  const nv = () => { $('nv').innerHTML = `<div class="lin" style="grid-template-columns:1.2fr .9fr .8fr 50px 1.6fr auto;font-size:12px;color:var(--muted)"><span>Nombre</span><span>Desde (XP)</span><span>Multiplica</span><span>Color</span><span>Beneficio</span><span></span></div>` + g.niveles.map((n, i) => `<div class="lin" style="grid-template-columns:1.2fr .9fr .8fr 50px 1.6fr auto"><input class="in" data-i="${i}" data-k="nombre" value="${esc(n.nombre)}"><input class="in" type="number" data-i="${i}" data-k="desde" value="${n.desde}"><input class="in" type="number" step="0.05" data-i="${i}" data-k="multiplicador" value="${n.multiplicador}"><input class="in" type="color" data-i="${i}" data-k="color" value="${esc(n.color)}"><input class="in" data-i="${i}" data-k="beneficio" value="${esc(n.beneficio || '')}"><button class="ib d" data-q="${i}"><i class="fa-solid fa-trash"></i></button></div>`).join(''); };
+  const pr = () => { const s = g.ruleta.premios.reduce((a, p) => a + Number(p.peso || 0), 0); $('pr').innerHTML = `<div class="lin" style="grid-template-columns:1.4fr .9fr .9fr .7fr 50px auto;font-size:12px;color:var(--muted)"><span>Premio</span><span>Puntos</span><span>Peso</span><span>Probab.</span><span>Color</span><span></span></div>` + g.ruleta.premios.map((p, i) => `<div class="lin" style="grid-template-columns:1.4fr .9fr .9fr .7fr 50px auto"><input class="in" data-i="${i}" data-k="nombre" value="${esc(p.nombre)}"><input class="in" type="number" data-i="${i}" data-k="valor" value="${p.valor}"><input class="in" type="number" data-i="${i}" data-k="peso" value="${p.peso}"><span class="bd">${s ? fnum(p.peso * 100 / s, 1) : 0}%</span><input class="in" type="color" data-i="${i}" data-k="color" value="${esc(p.color)}"><button class="ib d" data-q="${i}"><i class="fa-solid fa-trash"></i></button></div>`).join(''); };
+  const lig = (id, l, p) => { $(id).oninput = e => { const d = e.target.dataset; if (d.i) l()[d.i][d.k] = e.target.type === 'number' ? Number(e.target.value) : e.target.value; }; $(id).onchange = p; $(id).onclick = e => { const q = e.target.closest('[data-q]'); if (q) { l().splice(Number(q.dataset.q), 1); p(); } }; };
+  lig('nv', () => g.niveles, nv); lig('pr', () => g.ruleta.premios, pr); nv(); pr();
+  $('nn').onclick = () => { g.niveles.push({ nombre: 'Nuevo', desde: 10000, multiplicador: 2, color: '#5A49E0', beneficio: '' }); nv(); }; $('np').onclick = () => { g.ruleta.premios.push({ nombre: 'Premio', tipo: 'puntos', valor: 10, peso: 10, color: '#05C3DD' }); pr(); };
+  $('s').onclick = async () => { const r = await datos('/configuracion', 'PUT', { gamificacion: { ...f.tomar(), niveles: [...g.niveles].sort((a, b) => a.desde - b.desde), ruleta: { ...fr.tomar(), premios: g.ruleta.premios.map(p => ({ ...p, tipo: p.valor > 0 ? 'puntos' : 'nada' })) } } }); if (r) toast('Guardado'); };
+})();
+</script>
+</body>
+</html>

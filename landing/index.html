@@ -1,0 +1,300 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Katú POS — La caja que vende en tienda, a domicilio y por WhatsApp</title>
+  <meta name="description" content="Punto de venta para minimercados y tiendas: caja rápida con báscula, factura electrónica DIAN, inventario, domicilios, WhatsApp con inteligencia artificial, autopago y marketing. Tu negocio listo en minutos en tu propio subdominio.">
+  <meta name="theme-color" content="#060B16">
+  <meta property="og:title" content="Katú POS — Vende más, desde una sola caja">
+  <meta property="og:description" content="Caja, factura electrónica, domicilios, WhatsApp con IA y autopago. Listo en minutos.">
+  <meta property="og:type" content="website">
+  <link rel="icon" href="img/favicon.ico">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Sora:wght@500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+  <link rel="stylesheet" href="estilos.css">
+</head>
+<body>
+
+<header class="nav" id="nav">
+  <div class="contenedor nav-in">
+    <a href="#" class="marca" aria-label="Katú POS, inicio"><span class="marca-ic"><i class="fa-solid fa-bolt"></i></span>Katú <b>POS</b></a>
+    <nav class="nav-links" id="menu" aria-label="Principal">
+      <a href="#funciones">Funciones</a><a href="#whatsapp">WhatsApp con IA</a><a href="#autopago">Autopago</a><a href="#planes">Planes</a><a href="#preguntas">Preguntas</a>
+    </nav>
+    <div class="nav-acc">
+      <a href="#planes" class="btn btn-brillo">Empieza ahora</a>
+      <button class="hamb" id="hamb" aria-label="Abrir menú" aria-expanded="false"><i class="fa-solid fa-bars"></i></button>
+    </div>
+  </div>
+</header>
+
+<main>
+  <!-- ── Hero ── -->
+  <section class="hero">
+    <div class="aurora" aria-hidden="true"><span></span><span></span><span></span></div>
+    <div class="rejilla-fondo" aria-hidden="true"></div>
+    <div class="contenedor hero-in">
+      <div class="hero-txt">
+        <span class="pildora"><span class="punto"></span> Nuevo: asistente de WhatsApp con IA que toma pedidos solo</span>
+        <h1><span class="h1-l">La caja que vende</span><span class="h1-l rot"><span class="degradado" id="rotador">en tu tienda</span></span><span class="h1-l">y nunca se detiene.</span></h1>
+        <p class="hero-sub">Katú POS une la caja, la báscula, la factura electrónica, el inventario, los domicilios y WhatsApp en un solo sistema. Te suscribes hoy y en minutos tu negocio está en <b>tunegocio.katupos.com</b>.</p>
+        <div class="hero-cta">
+          <a href="#planes" class="btn btn-brillo btn-xl">Ver planes <i class="fa-solid fa-arrow-right"></i></a>
+          <a href="#funciones" class="btn btn-vidrio btn-xl"><i class="fa-solid fa-play"></i> Cómo funciona</a>
+        </div>
+        <ul class="hero-confianza">
+          <li><i class="fa-solid fa-file-invoice"></i> Factura electrónica DIAN</li>
+          <li><i class="fa-solid fa-wifi"></i> Vende aunque se caiga internet</li>
+          <li><i class="fa-solid fa-lock"></i> Pago seguro con Stripe</li>
+        </ul>
+      </div>
+
+      <!-- Maqueta viva de la caja -->
+      <div class="hero-visual" aria-hidden="true">
+        <div class="pantalla" id="pantalla">
+          <div class="pt-barra"><span class="pt-marca"><i class="fa-solid fa-bolt"></i></span><b>Minimarket Órbita</b><span class="pt-sep"></span><span class="pt-ok"><i></i> En línea</span></div>
+          <div class="pt-cuerpo">
+            <div class="pt-rejilla">
+              <div class="pt-prod" style="--c:#22C55E"><i class="fa-solid fa-carrot"></i><span>Tomate</span><b>$4.800/kg</b></div>
+              <div class="pt-prod" style="--c:#F59E0B"><i class="fa-solid fa-cheese"></i><span>Leche 1 L</span><b>$4.600</b></div>
+              <div class="pt-prod" style="--c:#05C3DD"><i class="fa-solid fa-bottle-water"></i><span>Agua</span><b>$2.400</b></div>
+              <div class="pt-prod" style="--c:#D97706"><i class="fa-solid fa-bread-slice"></i><span>Croissant</span><b>$2.800</b></div>
+              <div class="pt-prod" style="--c:#8B5CF6"><i class="fa-solid fa-jar"></i><span>Arroz 1 kg</span><b>$4.900</b></div>
+              <div class="pt-prod" style="--c:#EC4899"><i class="fa-solid fa-cookie-bite"></i><span>Papas</span><b>$5.400</b></div>
+            </div>
+            <div class="pt-tiquete">
+              <div class="pt-lineas" id="ptLineas"></div>
+              <div class="pt-total"><span>Total</span><b id="ptTotal">$0</b></div>
+              <div class="pt-cobrar">Cobrar</div>
+            </div>
+          </div>
+        </div>
+        <div class="flota f1"><i class="fa-solid fa-circle-check"></i><div><b>Factura aceptada</b><small>DIAN · SETP994526727</small></div></div>
+        <div class="flota f2"><i class="fa-brands fa-whatsapp"></i><div><b>Nuevo pedido por WhatsApp</b><small>D-00003 · $14.360</small></div></div>
+        <div class="flota f3"><i class="fa-solid fa-weight-scale"></i><div><b>1,255 kg</b><small>Báscula estable</small></div></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ── Franja ── -->
+  <div class="franja" aria-hidden="true"><div class="franja-in">
+    <span><i class="fa-solid fa-barcode"></i> Lector de códigos</span><span><i class="fa-solid fa-weight-scale"></i> Báscula integrada</span><span><i class="fa-solid fa-file-invoice"></i> Factura electrónica</span><span><i class="fa-solid fa-motorcycle"></i> Domicilios</span><span><i class="fa-brands fa-whatsapp"></i> WhatsApp con IA</span><span><i class="fa-solid fa-cash-register"></i> Autopago</span><span><i class="fa-solid fa-qrcode"></i> Pagos QR</span><span><i class="fa-solid fa-bullhorn"></i> Campañas</span><span><i class="fa-solid fa-trophy"></i> Puntos y niveles</span><span><i class="fa-solid fa-store"></i> Multisede</span>
+    <span><i class="fa-solid fa-barcode"></i> Lector de códigos</span><span><i class="fa-solid fa-weight-scale"></i> Báscula integrada</span><span><i class="fa-solid fa-file-invoice"></i> Factura electrónica</span><span><i class="fa-solid fa-motorcycle"></i> Domicilios</span><span><i class="fa-brands fa-whatsapp"></i> WhatsApp con IA</span><span><i class="fa-solid fa-cash-register"></i> Autopago</span><span><i class="fa-solid fa-qrcode"></i> Pagos QR</span><span><i class="fa-solid fa-bullhorn"></i> Campañas</span><span><i class="fa-solid fa-trophy"></i> Puntos y niveles</span><span><i class="fa-solid fa-store"></i> Multisede</span>
+  </div></div>
+
+  <!-- ── Funciones ── -->
+  <section class="seccion claro" id="funciones">
+    <div class="contenedor">
+      <div class="titular revelar">
+        <span class="etiqueta">Todo en un solo lugar</span>
+        <h2>Deja de saltar entre cuadernos, hojas de cálculo y cinco aplicaciones.</h2>
+        <p>Cada venta descuenta inventario, emite la factura, suma puntos al cliente y aparece en tus informes. En tiempo real, en todas tus sedes.</p>
+      </div>
+      <div class="bento">
+        <article class="caja grande revelar">
+          <div class="caja-ic"><i class="fa-solid fa-bolt"></i></div>
+          <h3>Caja ultrarrápida</h3>
+          <p>Escanea, pesa y cobra en segundos. Atajos de teclado, lector de códigos, etiquetas de báscula con peso o precio, promociones automáticas y varios medios de pago en una misma venta.</p>
+          <div class="mini-caja" aria-hidden="true"><span><kbd>F2</kbd> Buscar</span><span><kbd>F4</kbd> Cliente</span><span><kbd>F9</kbd> Báscula</span><span><kbd>F12</kbd> Cobrar</span></div>
+        </article>
+        <article class="caja revelar"><div class="caja-ic v"><i class="fa-solid fa-file-invoice"></i></div><h3>Factura electrónica DIAN</h3><p>Se emite sola en cada venta, con reintentos que nunca duplican. Notas crédito automáticas en las devoluciones.</p></article>
+        <article class="caja revelar"><div class="caja-ic n"><i class="fa-solid fa-wifi"></i></div><h3>Funciona sin internet</h3><p>Si se cae la conexión, la caja sigue vendiendo y sincroniza todo cuando vuelve.</p></article>
+        <article class="caja revelar"><div class="caja-ic a"><i class="fa-solid fa-boxes-stacked"></i></div><h3>Inventario que se cuida solo</h3><p>Existencias por sede, compras a proveedores, lotes y vencimientos, y sugerencias de reabastecimiento.</p></article>
+        <article class="caja revelar"><div class="caja-ic r"><i class="fa-solid fa-handshake"></i></div><h3>Fiado sin cuaderno</h3><p>Cupo por cliente, abonos y cartera al día. Nadie fía más de lo que debe.</p></article>
+        <article class="caja ancha revelar">
+          <div class="caja-ic"><i class="fa-solid fa-chart-column"></i></div>
+          <h3>Informes y arqueos claros</h3>
+          <p>Ventas por hora, producto, cajero y medio de pago. Arqueo ciego al cerrar turno y una liga de cajeros que motiva al equipo.</p>
+          <div class="barras" aria-hidden="true"><i style="--h:38%"></i><i style="--h:52%"></i><i style="--h:44%"></i><i style="--h:70%"></i><i style="--h:62%"></i><i style="--h:88%"></i><i style="--h:76%"></i><i style="--h:95%"></i></div>
+        </article>
+      </div>
+    </div>
+  </section>
+
+  <!-- ── WhatsApp con IA ── -->
+  <section class="seccion oscuro" id="whatsapp">
+    <div class="aurora suave" aria-hidden="true"><span></span><span></span></div>
+    <div class="contenedor dos-col">
+      <div class="revelar">
+        <span class="etiqueta">WhatsApp con inteligencia artificial</span>
+        <h2>Tu mejor vendedor atiende WhatsApp a las 10 de la noche.</h2>
+        <p class="lead">Cada negocio tiene su propio número. El asistente busca en tu catálogo real, arma el pedido, calcula el domicilio con la ubicación del cliente y lo confirma. Si hay una queja o algo que no puede resolver, se lo pasa a tu asesor.</p>
+        <ul class="lista-check">
+          <li><i class="fa-solid fa-check"></i> Precios y existencias reales: nunca inventa</li>
+          <li><i class="fa-solid fa-check"></i> Bandeja para tus asesores, con historial y mapa</li>
+          <li><i class="fa-solid fa-check"></i> Avisos automáticos: recibido, en camino con PIN y entregado</li>
+          <li><i class="fa-solid fa-check"></i> El pedido entra directo a tu tablero de domicilios</li>
+        </ul>
+      </div>
+      <div class="telefono revelar" aria-hidden="true">
+        <div class="tel-marco">
+          <div class="tel-cab"><span class="tel-av"><i class="fa-solid fa-store"></i></span><div><b>Minimarket Órbita</b><small id="telEstado">en línea</small></div></div>
+          <div class="tel-chat" id="chat"></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ── Domicilios y tienda en línea ── -->
+  <section class="seccion claro">
+    <div class="contenedor dos-col invertido">
+      <div class="navegador revelar" aria-hidden="true">
+        <div class="nav-barra"><i></i><i></i><i></i><div class="url"><i class="fa-solid fa-lock"></i> <span id="url">orbita</span>.katupos.com</div></div>
+        <div class="nav-cuerpo">
+          <div class="tienda-cab"><b>Minimarket Órbita</b><span><i class="fa-solid fa-location-dot"></i> Entrega en 25 min</span></div>
+          <div class="tienda-rej">
+            <div style="--c:#22C55E"><i class="fa-solid fa-apple-whole"></i><span>Frutas</span></div>
+            <div style="--c:#F59E0B"><i class="fa-solid fa-cheese"></i><span>Lácteos</span></div>
+            <div style="--c:#D97706"><i class="fa-solid fa-bread-slice"></i><span>Panadería</span></div>
+            <div style="--c:#05C3DD"><i class="fa-solid fa-bottle-water"></i><span>Bebidas</span></div>
+          </div>
+          <div class="seguimiento"><div class="seg-paso ok"><i class="fa-solid fa-check"></i>Recibido</div><div class="seg-paso ok"><i class="fa-solid fa-check"></i>Preparando</div><div class="seg-paso act"><i class="fa-solid fa-motorcycle"></i>En camino</div><div class="seg-paso"><i class="fa-solid fa-house"></i>Entregado</div></div>
+        </div>
+      </div>
+      <div class="revelar">
+        <span class="etiqueta">Domicilios y tienda en línea</span>
+        <h2>Tu tienda en línea, con tu nombre, desde el primer día.</h2>
+        <p class="lead">Al suscribirte recibes <b>tunegocio.katupos.com</b>: tus clientes piden, pagan con QR o contra entrega y siguen su pedido en vivo. Tú los alistas con el peso real de la báscula y tu domiciliario entrega con PIN.</p>
+        <ul class="lista-check oscura">
+          <li><i class="fa-solid fa-check"></i> Zonas de cobertura con tarifas y pedido mínimo</li>
+          <li><i class="fa-solid fa-check"></i> App para domiciliarios con ruta y liquidación</li>
+          <li><i class="fa-solid fa-check"></i> La factura se emite al entregar, con el peso real</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <!-- ── Autopago ── -->
+  <section class="seccion oscuro" id="autopago">
+    <div class="contenedor dos-col">
+      <div class="revelar">
+        <span class="etiqueta">Kiosco de autopago</span>
+        <h2>Filas más cortas sin contratar más cajeros.</h2>
+        <p class="lead">Tus clientes escanean, pesan y pagan solos con QR o datáfono. Sin etiquetas especiales: usa los códigos de barras que ya traen tus productos.</p>
+        <div class="datos">
+          <div><b>0</b><span>tags o etiquetas extra por producto</span></div>
+          <div><b>QR · tarjeta</b><span>solo pagos confirmados por el equipo</span></div>
+          <div><b>PIN</b><span>del supervisor para quitar productos</span></div>
+        </div>
+      </div>
+      <div class="kiosco revelar" aria-hidden="true">
+        <div class="kio-pant">
+          <div class="kio-ok"><i class="fa-solid fa-check"></i></div>
+          <b>¡Gracias por tu compra!</b>
+          <span>Factura enviada · Toma tu recibo</span>
+        </div>
+        <div class="kio-base"><span class="kio-lector"><i class="fa-solid fa-barcode"></i></span><span class="kio-bascula"></span></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ── Marketing y gamificación ── -->
+  <section class="seccion claro">
+    <div class="contenedor">
+      <div class="titular revelar">
+        <span class="etiqueta">Clientes que vuelven</span>
+        <h2>Haz que te elijan otra vez.</h2>
+        <p>Puntos, niveles y misiones que tus clientes ven en tu tienda en línea. Campañas por WhatsApp y correo solo para quienes las autorizaron, con las ventas que generó cada una.</p>
+      </div>
+      <div class="tres-tarjetas">
+        <article class="tarjeta revelar"><div class="tj-cab"><i class="fa-solid fa-bullhorn"></i> Campaña</div><b class="tj-big">Frutas fin de semana</b><div class="tj-met"><span><b>1.240</b> enviados</span><span><b>92%</b> entregados</span></div><div class="tj-barra"><i style="--w:92%"></i></div><small>Ejemplo ilustrativo</small></article>
+        <article class="tarjeta revelar"><div class="tj-cab"><i class="fa-solid fa-trophy"></i> Nivel</div><b class="tj-big">Oro · 1.400 pts</b><div class="aro-g"><span>78%</span></div><small>Faltan 300 pts para Diamante</small></article>
+        <article class="tarjeta revelar"><div class="tj-cab"><i class="fa-solid fa-bolt"></i> Misión</div><b class="tj-big">Compra 3 semanas seguidas</b><div class="racha"><i class="on"></i><i class="on"></i><i></i></div><small>+200 puntos al completarla</small></article>
+      </div>
+    </div>
+  </section>
+
+  <!-- ── Cómo empezar ── -->
+  <section class="seccion oscuro">
+    <div class="contenedor">
+      <div class="titular revelar centro">
+        <span class="etiqueta">Listo en minutos</span>
+        <h2>De la suscripción a tu primera venta, sin llamadas ni esperas.</h2>
+      </div>
+      <ol class="pasos">
+        <li class="revelar"><span>1</span><h3>Elige tu plan</h3><p>Y el nombre de tu subdominio: <b>tunegocio</b>.katupos.com</p></li>
+        <li class="revelar"><span>2</span><h3>Paga seguro</h3><p>Con tarjeta en la página de Stripe. Cancelas cuando quieras.</p></li>
+        <li class="revelar"><span>3</span><h3>Entra y vende</h3><p>Tu negocio se crea al instante: te llega un correo para crear tu contraseña.</p></li>
+      </ol>
+    </div>
+  </section>
+
+  <!-- ── Planes ── -->
+  <section class="seccion claro" id="planes">
+    <div class="contenedor">
+      <div class="titular revelar centro">
+        <span class="etiqueta">Planes</span>
+        <h2>Un precio claro. Crece cuando lo necesites.</h2>
+        <div class="selector" role="tablist" aria-label="Periodo de pago">
+          <button role="tab" class="on" data-p="mensual" aria-selected="true">Mensual</button>
+          <button role="tab" data-p="anual" aria-selected="false">Anual <em>2 meses gratis</em></button>
+        </div>
+      </div>
+      <div class="planes" id="planesLista"></div>
+      <p class="nota-planes">Precios en pesos colombianos. Sin cláusula de permanencia. <span id="modoPrueba"></span></p>
+    </div>
+  </section>
+
+  <!-- ── Preguntas ── -->
+  <section class="seccion claro sin-arriba" id="preguntas">
+    <div class="contenedor angosto">
+      <div class="titular revelar centro"><span class="etiqueta">Preguntas frecuentes</span><h2>Lo que nos suelen preguntar</h2></div>
+      <div class="faq">
+        <details class="revelar"><summary>¿Necesito instalar algo?</summary><p>No. Katú POS funciona en el navegador de cualquier computador, tablet o celular. Solo si conectas una báscula o una impresora térmica por cable instalas un pequeño agente local, y te guiamos paso a paso.</p></details>
+        <details class="revelar"><summary>¿Qué pasa si se cae el internet?</summary><p>La caja sigue vendiendo en efectivo y datáfono. Las ventas se guardan en el equipo y se sincronizan, con su factura, en cuanto vuelve la conexión.</p></details>
+        <details class="revelar"><summary>¿La factura electrónica tiene costo adicional?</summary><p>La emisión está incluida en todos los planes. Solo necesitas tu resolución de facturación de la DIAN; te acompañamos en la habilitación.</p></details>
+        <details class="revelar"><summary>¿Cómo funciona el WhatsApp con IA?</summary><p>Tu negocio tiene su propio número de WhatsApp Business. El asistente atiende, arma el pedido con tu catálogo real y lo confirma; tus asesores pueden tomar cualquier conversación en cualquier momento. El número requiere la aprobación de Meta, que gestionamos contigo.</p></details>
+        <details class="revelar"><summary>¿Puedo cambiar de plan o cancelar?</summary><p>Sí, cuando quieras, desde "Mi suscripción" en tu panel. No hay permanencia: si cancelas, dejas de pagar al final del periodo y tus datos se conservan.</p></details>
+        <details class="revelar"><summary>¿Mis datos están seguros?</summary><p>Cada negocio solo ve su información. Los pagos de la suscripción los procesa Stripe: nunca guardamos los datos de tu tarjeta. Hacemos copias de seguridad diarias.</p></details>
+      </div>
+    </div>
+  </section>
+
+  <!-- ── Llamado final ── -->
+  <section class="cierre">
+    <div class="aurora" aria-hidden="true"><span></span><span></span><span></span></div>
+    <div class="contenedor cierre-in revelar">
+      <h2>Tu negocio, listo para vender hoy.</h2>
+      <p>Elige tu plan y en minutos estás cobrando en tu propio subdominio.</p>
+      <a href="#planes" class="btn btn-brillo btn-xl">Empezar ahora <i class="fa-solid fa-arrow-right"></i></a>
+    </div>
+  </section>
+</main>
+
+<footer class="pie">
+  <div class="contenedor pie-in">
+    <a href="#" class="marca"><span class="marca-ic"><i class="fa-solid fa-bolt"></i></span>Katú <b>POS</b></a>
+    <nav><a href="#funciones">Funciones</a><a href="#planes">Planes</a><a href="#preguntas">Preguntas</a><a id="contacto" href="#">Contacto</a></nav>
+    <small>© <span id="anio"></span> Katú. Hecho en Colombia.</small>
+  </div>
+</footer>
+
+<a class="wa-flot" id="waFlot" href="#" target="_blank" rel="noopener" aria-label="Escríbenos por WhatsApp" hidden><i class="fa-brands fa-whatsapp"></i></a>
+
+<!-- Registro -->
+<div class="velo" id="registro" hidden>
+  <form class="modal" id="fRegistro" novalidate>
+    <button type="button" class="cerrar" data-cerrar aria-label="Cerrar"><i class="fa-solid fa-xmark"></i></button>
+    <div class="modal-cab"><span class="etiqueta" id="rPlan">Plan</span><h3>Crea tu cuenta</h3><p>En el siguiente paso pagas de forma segura con Stripe.</p></div>
+    <div class="campos">
+      <label class="campo ancho"><span>Nombre de tu negocio</span><input id="rNegocio" required maxlength="80" autocomplete="organization" placeholder="Minimarket La Esquina"></label>
+      <label class="campo ancho"><span>Tu dirección web</span><div class="sub-campo"><input id="rSub" required maxlength="40" autocomplete="off" spellcheck="false" placeholder="la-esquina"><em>.katupos.com</em></div><small id="rSubEstado"></small></label>
+      <label class="campo"><span>Tu nombre</span><input id="rNombre" required maxlength="80" autocomplete="name"></label>
+      <label class="campo"><span>Celular</span><input id="rTel" inputmode="tel" maxlength="20" autocomplete="tel"></label>
+      <label class="campo ancho"><span>Correo (será tu usuario)</span><input id="rCorreo" type="email" required maxlength="120" autocomplete="email"></label>
+      <label class="campo"><span>País</span><select id="rPais"><option value="CO">Colombia</option><option value="MX">México</option><option value="PE">Perú</option><option value="CL">Chile</option><option value="EC">Ecuador</option><option value="PA">Panamá</option></select></label>
+      <label class="campo"><span>Periodo</span><select id="rPeriodo"><option value="mensual">Mensual</option><option value="anual">Anual (2 meses gratis)</option></select></label>
+    </div>
+    <div class="resumen" id="rResumen"></div>
+    <p class="error" id="rError" hidden></p>
+    <button class="btn btn-brillo btn-xl ancho" id="rEnviar"><i class="fa-solid fa-lock"></i> Continuar al pago seguro</button>
+    <small class="legal">Al continuar aceptas los términos del servicio y el tratamiento de tus datos para crear tu cuenta.</small>
+  </form>
+</div>
+
+<script src="config.js"></script>
+<script src="app.js"></script>
+</body>
+</html>

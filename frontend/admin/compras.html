@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Katú POS</title>
+  <link rel="icon" href="../assets/img/favicon.ico">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Sora:wght@500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+  <link rel="stylesheet" href="pos-admin.css">
+</head>
+<body data-pagina="compras">
+<main class="content"></main>
+<script src="../assets/js/motor.js"></script>
+<script src="pos-admin.js"></script>
+<script>
+(async function () {
+  if (!(await POS.listo)) return;
+
+  const [sedes, provs] = await Promise.all([datos('/sedes'), datos('/proveedores')]);
+  document.querySelector('main').innerHTML = `<div class="head"><div><h1>Compras</h1><p>Entran al inventario y actualizan el costo promedio.</p></div><div class="acts"><button class="btn p" id="nv"><i class="fa-solid fa-plus"></i> Registrar compra</button></div></div><div class="filtros" id="rg"></div><div class="card" id="t"></div>`;
+  const rg = rango($('rg'), () => cargar(), 29);
+  async function cargar() { const d = await datos('/compras?' + rg()); if (d) tabla($('t'), [{ t: 'Compra', f: c => `<b>${esc(c.numero)}</b><small>${fecha(c.createdAt)}</small>` }, { t: 'Proveedor', f: c => `${esc(c.proveedor?.nombre || '—')}<small>${esc(c.factura || '')}</small>` }, { t: 'Sede', f: c => esc(c.sede?.nombre) }, { t: 'Productos', n: 1, f: c => c.items.length }, { t: 'Total', n: 1, f: c => `<b>${dinero(c.total)}</b>` }], d, { vacio: 'No hay compras en este período', icono: 'fa-truck-ramp-box', clic: c => { const m = modal({ clase: 'l', titulo: `Compra ${esc(c.numero)}`, html: '<div class="card" id="i"></div>' }); tabla(m.q('#i'), [{ t: 'Producto', f: i => esc(i.nombre) }, { t: 'Cantidad', n: 1, f: i => fnum(i.cantidad) }, { t: 'Costo', n: 1, f: i => dinero(i.costo) }, { t: 'Vence', f: i => esc(i.vence || '—') }, { t: 'Total', n: 1, f: i => dinero(i.total) }], c.items); } }); }
+  function nueva(pre = [], prov = '') {
+    const it = pre; const m = modal({ clase: 'l', titulo: 'Registrar compra', html: '<div id="f"></div><div class="f" style="margin:16px 0"><label>Agregar producto</label><input class="in" id="pb" placeholder="Busca o escanea el código"></div><div id="ls"></div><p class="n" style="font-family:var(--titulo);font-size:20px;font-weight:700" id="tt"></p>', pie: '<button class="btn p" data-s>Guardar compra</button>' });
+    const f = formulario(m.q('#f'), [{ k: 'sede', l: 'Sede', t: 'lista', w: 4, op: sedes.map(s => [s._id, s.nombre]) }, { k: 'proveedor', l: 'Proveedor', t: 'lista', w: 4, vacio: 'Sin proveedor', op: provs.map(p => [p._id, p.nombre]), def: prov }, { k: 'factura', l: 'Factura del proveedor', w: 4 }]);
+    const tot = () => { m.q('#tt').textContent = 'Total ' + dinero(it.reduce((a, x) => a + (Number(x.cantidad) || 0) * (Number(x.costo) || 0), 0)); };
+    const ver = () => { m.q('#ls').innerHTML = it.map((x, i) => `<div class="lin" style="grid-template-columns:2fr .8fr 1fr 1.1fr .9fr auto"><input class="in" disabled value="${esc(x.nombre)}"><input class="in" type="number" step="any" placeholder="Cantidad" data-i="${i}" data-k="cantidad" value="${x.cantidad}"><input class="in" type="number" step="any" placeholder="Costo unitario" data-i="${i}" data-k="costo" value="${x.costo}"><input class="in" type="date" data-i="${i}" data-k="vence" value="${x.vence || ''}" ${x.mv ? '' : 'disabled'} title="Vencimiento"><input class="in" placeholder="Lote" data-i="${i}" data-k="lote" value="${esc(x.lote || '')}" ${x.mv ? '' : 'disabled'}><button class="ib d" data-q="${i}"><i class="fa-solid fa-trash"></i></button></div>`).join(''); tot(); };
+    buscarProducto(m.q('#pb'), p => { const e = it.find(x => x.producto === p._id); if (e && !p.manejaVencimiento) e.cantidad = Number(e.cantidad) + 1; else it.push({ producto: p._id, nombre: p.nombre, cantidad: 1, costo: p.costo || 0, mv: p.manejaVencimiento }); ver(); });
+    m.q('#ls').oninput = e => { const d = e.target.dataset; if (d.i) { it[d.i][d.k] = e.target.value; tot(); } }; m.q('#ls').onclick = e => { const q = e.target.closest('[data-q]'); if (q) { it.splice(Number(q.dataset.q), 1); ver(); } };
+    m.q('[data-s]').onclick = async e => { e.target.disabled = true; const r = await datos('/compras', 'POST', { ...f.tomar(), items: it.map(x => ({ ...x, cantidad: Number(x.cantidad), costo: Number(x.costo) })) }); e.target.disabled = false; if (r) { m.cerrar(); toast(`Compra ${r.numero} registrada`); cargar(); } };
+    ver();
+  }
+  $('nv').onclick = () => nueva();
+  try { const p = JSON.parse(sessionStorage.getItem('katu_sugerido') || 'null'); if (p) { sessionStorage.removeItem('katu_sugerido'); nueva(p.items, p.proveedor); } } catch {}
+  cargar();
+})();
+</script>
+</body>
+</html>

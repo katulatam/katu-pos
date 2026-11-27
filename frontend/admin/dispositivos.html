@@ -1,0 +1,32 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Katú POS</title>
+  <link rel="icon" href="../assets/img/favicon.ico">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Sora:wght@500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+  <link rel="stylesheet" href="pos-admin.css">
+</head>
+<body data-pagina="dispositivos">
+<main class="content"></main>
+<script src="../assets/js/motor.js"></script>
+<script src="pos-admin.js"></script>
+<script>
+(async function () {
+  if (!(await POS.listo)) return;
+
+  const cajas = await datos('/cajas') || [];
+  document.querySelector('main').innerHTML = `<div class="head"><div><h1>Kioscos y datáfonos</h1><p>Equipos de cobro que se conectan solos a la nube. Cada uno firma sus peticiones con un secreto propio que solo se muestra al crearlo.</p></div><div class="acts"><button class="btn p" id="nv"><i class="fa-solid fa-plus"></i> Nuevo equipo</button></div></div><div class="card" id="t"></div>`;
+  const campos = [{ k: 'nombre', l: 'Nombre', req: 1, w: 12 }, { k: 'tipo', l: 'Tipo', t: 'lista', w: 12, op: [['kiosco_efectivo', 'Kiosco de efectivo'], ['terminal', 'Datáfono integrado']] }, { k: 'caja', l: 'Caja', t: 'lista', w: 12, vacio: 'Sin caja', op: cajas.map(c => [c._id, c.nombre]) }];
+  const secreto = d => modal({ titulo: 'Guarda estas credenciales', html: `<div class="aviso a" style="margin-bottom:14px"><i class="fa-solid fa-key"></i><span>El secreto no se vuelve a mostrar. Cópialo al equipo ahora.</span></div><p style="margin-bottom:6px">Device ID</p><div class="mono">${esc(d.deviceId)}</div><p style="margin:14px 0 6px">Secreto</p><div class="mono">${esc(d.secret)}</div>` });
+  async function cargar() { const d = await datos('/dispositivos'); if (!d) return; tabla($('t'), [{ t: 'Equipo', f: x => `<b>${esc(x.nombre)}</b><small>${esc(x.deviceId)}</small>` }, { t: 'Tipo', f: x => x.tipo === 'terminal' ? 'Datáfono' : 'Kiosco de efectivo' }, { t: 'Caja', f: x => esc(x.caja?.nombre || '—') }, { t: 'Conexión', f: x => x.ultimaConexion ? `<span class="bd ${Date.now() - new Date(x.ultimaConexion) < 120000 ? 'ok' : ''}">${fecha(x.ultimaConexion)}</span>` : 'Nunca' }, { t: 'Estado', f: x => si(x.activo) }, { t: '', n: 1, f: x => `<div class="ac"><button class="btn sm" data-r="${x._id}">Nuevo secreto</button><button class="btn sm" data-a="${x._id}">${x.activo ? 'Desactivar' : 'Activar'}</button></div>` }], d, { vacio: 'No hay equipos de cobro conectados', icono: 'fa-tablet-screen-button' });
+    document.querySelectorAll('[data-r]').forEach(b => { b.onclick = async () => { if (!await confirmar('Nuevo secreto', 'El equipo dejará de funcionar hasta que le pongas el nuevo.', 'Generar')) return; const r = await datos(`/dispositivos/${b.dataset.r}/regenerar`, 'POST', {}); if (r) secreto(r); }; });
+    document.querySelectorAll('[data-a]').forEach(b => { b.onclick = async () => { const x = d.find(y => y._id === b.dataset.a); if (await datos('/dispositivos/' + x._id, 'PUT', { activo: !x.activo })) cargar(); }; }); }
+  $('nv').onclick = () => { const m = modal({ clase: 's', titulo: 'Nuevo equipo', html: '<div id="f"></div>', pie: '<button class="btn p" data-s>Crear</button>' }); const f = formulario(m.q('#f'), campos); m.q('[data-s]').onclick = async () => { const o = f.validar(); if (!o) return; const r = await datos('/dispositivos', 'POST', o); if (r) { m.cerrar(); secreto(r); cargar(); } }; };
+  cargar();
+})();
+</script>
+</body>
+</html>

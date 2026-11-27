@@ -1,0 +1,28 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Katú POS</title>
+  <link rel="icon" href="../assets/img/favicon.ico">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Sora:wght@500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+  <link rel="stylesheet" href="pos-admin.css">
+</head>
+<body data-pagina="usuarios">
+<main class="content"></main>
+<script src="../assets/js/motor.js"></script>
+<script src="pos-admin.js"></script>
+<script>
+(async function () {
+  if (!(await POS.listo)) return;
+
+  const sedes = await datos('/sedes') || []; const RL = { admin: 'Administración', supervisor: 'Supervisión', cajero: 'Caja', bodega: 'Bodega', domiciliario: 'Domicilios', asesor: 'Asesor de WhatsApp' };
+  crud({ ruta: '/usuarios', titulo: 'Usuarios', sub: 'El PIN de supervisor autoriza descuentos y devoluciones en la caja.', nuevo: 'Nuevo usuario', borrar: false, buscar: true, icono: 'fa-user-gear',
+    columnas: [{ t: 'Usuario', f: u => `<b>${esc(u.nombre)}</b><small>${esc(u.correo)}</small>` }, { t: 'Rol', f: u => `<span class="bd az">${RL[u.rol]}</span>` }, { t: 'Sede', f: u => esc(sedes.find(s => s._id === u.sede)?.nombre || 'Todas') }, { t: 'PIN', f: u => u.tienePin ? 'Sí' : '—' }, { t: 'Último ingreso', f: u => fecha(u.ultimoAcceso) }, { t: 'Estado', f: u => si(u.estado) }],
+    campos: f => [{ k: 'nombre', l: 'Nombre', req: 1 }, { k: 'correo', l: 'Correo', req: 1 }, { k: 'rol', l: 'Rol', t: 'lista', op: Object.entries(RL) }, { k: 'sede', l: 'Sede', t: 'lista', vacio: 'Todas', op: sedes.map(s => [s._id, s.nombre]) }, { k: 'password', l: f ? 'Contraseña (vacía = no cambia)' : 'Contraseña (mínimo 8)', t: 'clave', req: !f }, { k: 'pin', l: 'PIN (4 a 6 dígitos)', t: 'clave', si: o => ['admin', 'supervisor'].includes(o.rol) }, { k: 'telefono', l: 'Celular' }, { k: 'vehiculo', l: 'Vehículo y placa', si: o => o.rol === 'domiciliario' }, { k: 'estado', l: 'Activo', t: 'si', def: true }],
+    preparar: o => { if (!o.password) delete o.password; if (!o.pin) delete o.pin; return o; } }).cargar();
+})();
+</script>
+</body>
+</html>

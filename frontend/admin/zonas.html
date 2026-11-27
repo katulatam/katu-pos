@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Katú POS</title>
+  <link rel="icon" href="../assets/img/favicon.ico">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Sora:wght@500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
+  <link rel="stylesheet" href="pos-admin.css">
+</head>
+<body data-pagina="zonas">
+<main class="content"></main>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+<script src="../assets/js/motor.js"></script>
+<script src="pos-admin.js"></script>
+<script>
+(async function () {
+  if (!(await POS.listo)) return;
+
+  const sedes = await datos('/sedes') || [];
+  document.querySelector('main').innerHTML = `<div class="head"><div><h1>Zonas de cobertura</h1><p>Geocercas de domicilios: un radio alrededor de la sede o un polígono dibujado. Si dos zonas cubren al cliente, gana la de menor prioridad.</p></div><div class="acts"><button class="btn p" id="nv"><i class="fa-solid fa-plus"></i> Nueva zona</button></div></div><div class="dos"><div class="card"><div class="b"><div class="mapa" id="mapa" style="height:560px"></div></div></div><div class="card"><div id="t"></div></div></div>`;
+  const mapa = L.map('mapa').setView([4.65, -74.06], 12); L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19, attribution: '© OpenStreetMap' }).addTo(mapa);
+  let zonas = [], capas = [];
+  const dibujar = (z, mp) => z.tipo === 'poligono' ? L.polygon(z.poligono.map(p => [p.lat, p.lng]), { color: z.color, weight: 2, fillOpacity: .15 }).addTo(mp) : L.circle([z.centro.lat, z.centro.lng], { radius: z.radioM, color: z.color, weight: 2, fillOpacity: .13 }).addTo(mp);
+  async function cargar() {
+    zonas = await datos('/zonas') || []; capas.forEach(c => c.remove()); capas = zonas.filter(z => z.activo).map(z => dibujar(z, mapa).bindTooltip(esc(z.nombre)));
+    sedes.filter(s => s.ubicacion?.lat).forEach(s => capas.push(L.marker([s.ubicacion.lat, s.ubicacion.lng]).bindTooltip(esc(s.nombre)).addTo(mapa)));
+    if (capas.length) mapa.fitBounds(L.featureGroup(capas).getBounds(), { padding: [20, 20] });
+    tabla($('t'), [{ t: 'Zona', f: z => `<b><i class="fa-solid ${z.tipo === 'radio' ? 'fa-circle' : 'fa-draw-polygon'}" style="color:${esc(z.color)}"></i> ${esc(z.nombre)}</b><small>${z.tipo === 'radio' ? fnum(z.radioM / 1000, 1) + ' km a la redonda' : z.poligono.length + ' puntos'}</small>` }, { t: 'Tarifa', n: 1, f: z => `${dinero(z.tarifaBase)}${z.tarifaKm ? `<small>+${dinero(z.tarifaKm)}/km</small>` : ''}` }, { t: '', f: z => si(z.activo, 'Activa', 'Inactiva') }], zonas, { vacio: 'Crea tu primera zona de domicilios', icono: 'fa-draw-polygon', clic: abrir });
+  }
+  function abrir(z) {
+    const m = modal({ clase: 'l', titulo: z ? 'Editar zona' : 'Nueva zona', html: '<div class="mitad"><div id="f"></div><div><div class="mapa" id="m2"></div><p style="font-size:12.5px;color:var(--muted);margin-top:8px" id="ay"></p></div></div>', pie: `${z ? '<button class="btn d" data-b style="margin-right:auto">Eliminar</button>' : ''}<button class="btn" data-l>Limpiar dibujo</button><button class="btn p" data-s>Guardar</button>` });
+    const f = formulario(m.q('#f'), [{ k: 'nombre', l: 'Nombre', req: 1 }, { k: 'sede', l: 'Sede que despacha', t: 'lista', op: sedes.map(s => [s._id, s.nombre]), req: 1 }, { k: 'tipo', l: 'Forma', t: 'lista', op: [['radio', 'Radio'], ['poligono', 'Polígono']] }, { k: 'radioM', l: 'Radio en metros', t: 'numero', def: 2000, si: o => o.tipo === 'radio' }, { k: 'color', l: 'Color', t: 'color' }, { k: 'prioridad', l: 'Prioridad', t: 'numero', def: 0 }, { k: 'tarifaBase', l: 'Tarifa base', t: 'dinero' }, { k: 'kmIncluidos', l: 'Km incluidos', t: 'numero' }, { k: 'tarifaKm', l: 'Por km adicional', t: 'dinero' }, { k: 'gratisDesde', l: 'Gratis desde', t: 'dinero' }, { k: 'pedidoMinimo', l: 'Pedido mínimo', t: 'dinero' }, { k: 'minutos', l: 'Minutos de entrega', t: 'numero', def: 40 }, { k: 'horaDesde', l: 'Atiende desde', t: 'hora' }, { k: 'horaHasta', l: 'Hasta', t: 'hora' }, { k: 'dias', l: 'Días (ninguno = todos)', t: 'dias' }, { k: 'activo', l: 'Zona activa', t: 'si', def: true }], z || {});
+    let centro = z?.centro?.lat ? z.centro : sedes.find(s => s.ubicacion?.lat)?.ubicacion || null, pol = z?.poligono ? z.poligono.map(p => ({ ...p })) : [];
+    const mp = L.map(m.q('#m2')).setView(centro ? [centro.lat, centro.lng] : [4.65, -74.06], 13); L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19, attribution: '© OpenStreetMap' }).addTo(mp);
+    let c = []; const pintar = () => { c.forEach(x => x.remove()); c = []; const o = f.tomar(); m.q('#ay').textContent = o.tipo === 'radio' ? 'Toca el mapa para mover el centro.' : 'Toca el mapa para agregar puntos; arrastra un punto para moverlo.'; if (o.tipo === 'radio') { if (centro) { c.push(L.circle([centro.lat, centro.lng], { radius: o.radioM || 0, color: o.color }).addTo(mp), L.marker([centro.lat, centro.lng]).addTo(mp)); } } else { if (pol.length > 1) c.push(L.polygon(pol.map(p => [p.lat, p.lng]), { color: o.color }).addTo(mp)); pol.forEach((p, i) => { const mk = L.marker([p.lat, p.lng], { draggable: true }).addTo(mp); mk.on('dragend', () => { const q = mk.getLatLng(); pol[i] = { lat: q.lat, lng: q.lng }; pintar(); }); c.push(mk); }); } };
+    mp.on('click', e => { if (f.tomar().tipo === 'radio') centro = { lat: e.latlng.lat, lng: e.latlng.lng }; else pol.push({ lat: e.latlng.lat, lng: e.latlng.lng }); pintar(); });
+    m.q('#f').addEventListener('input', pintar); m.q('#f').addEventListener('change', pintar); setTimeout(() => { mp.invalidateSize(); pintar(); if (c[0]?.getBounds) mp.fitBounds(c[0].getBounds()); }, 80);
+    m.q('[data-l]').onclick = () => { pol = []; pintar(); };
+    m.q('[data-b]')?.addEventListener('click', async () => { if (await confirmar('Eliminar zona', 'Los clientes de esta zona no podrán pedir domicilios.') && await datos('/zonas/' + z._id, 'DELETE')) { m.cerrar(); cargar(); } });
+    m.q('[data-s]').onclick = async () => { const o = f.validar(); if (!o) return; const r = await datos('/zonas' + (z ? '/' + z._id : ''), z ? 'PUT' : 'POST', { ...o, centro, poligono: pol }); if (r) { m.cerrar(); toast('Guardado'); cargar(); } };
+  }
+  $('nv').onclick = () => abrir(null);
+  if (!sedes.some(s => s.ubicacion?.lat)) document.querySelector('.head').insertAdjacentHTML('afterend', '<div class="aviso a"><i class="fa-solid fa-location-dot"></i><span>Ubica primero tu sede en el mapa (Ajustes → Sedes) para calcular distancias.</span></div>');
+  cargar();
+})();
+</script>
+</body>
+</html>

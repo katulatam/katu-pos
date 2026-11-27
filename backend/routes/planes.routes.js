@@ -1,0 +1,38 @@
+const r = require('express').Router();
+const Plan = require('../models/Plan');
+const Registro = require('../models/Registro');
+const Empresa = require('../models/Empresa');
+const sus = require('../utils/suscripciones');
+const { proteger, autorizar, soloSuper, requiereEmpresa } = require('../middleware/auth');
+const { manejar, ErrorApi } = require('../utils/contexto');
+
+r.use(proteger);
+
+// El comercio: su plan y el portal de Stripe (tarjeta, facturas, cambio o cancelación)
+r.get('/suscripcion', requiereEmpresa, autorizar('admin'), manejar(async req => {
+  const e = await Empresa.findById(req.empresa._id).lean(), s = e.suscripcion || {};
+  const plan = s.plan ? await Plan.findOne({ codigo: s.plan }).lean() : null;
+  return { administradaPorKatu: !s.stripeCliente, estado: s.estado || 'activa', periodo: s.periodo, actualHasta: s.actualHasta, moraDesde: s.moraDesde, diasGracia: sus.DIAS_GRACIA, plan: plan && sus.planPublico(plan), modulos: e.modulos };
+}));
+r.post('/suscripcion/portal', requiereEmpresa, autorizar('admin'), manejar(req => sus.portal(req.empresa)));
+
+// Equipo Katú: planes y registros de la landing
+const CAMPOS = ['nombre', 'descripcion', 'moneda', 'precioMensual', 'precioAnual', 'modulos', 'caracteristicas', 'destacado', 'diasPrueba', 'orden', 'activo'];
+const tomar = b => {
+  const d = Object.fromEntries(CAMPOS.filter(k => b[k] !== undefined).map(k => [k, b[k]]));
+  if (d.modulos) d.modulos = Object.fromEntries(sus.MODULOS.map(k => [k, !!d.modulos[k]]));
+  if (typeof d.caracteristicas === 'string') d.caracteristicas = d.caracteristicas.split('\n').map(x => x.trim()).filter(Boolean);
+  for (const k of ['precioMensual', 'precioAnual']) if (d[k] !== undefined && !(Number(d[k]) >= 0)) throw new ErrorApi('Precio inválido');
+  return d;
+};
+r.get('/planes', soloSuper, manejar(() => Plan.find().sort({ orden: 1 }).lean()));
+r.post('/planes', soloSuper, manejar(async (req, res) => { const codigo = String(req.body.codigo || '').toLowerCase().trim(); if (!/^[a-z0-9-]{2,30}$/.test(codigo)) throw new ErrorApi('Código inválido'); const p = await Plan.create({ ...tomar(req.body), codigo }); res.status(201); return p; }));
+r.put('/planes/:id', soloSuper, manejar(async req => { const p = await Plan.findByIdAndUpdate(req.params.id, tomar(req.body), { new: true, runValidators: true }).lean(); if (!p) throw new ErrorApi('El plan no existe', 404); return p; }));
+r.get('/registros', soloSuper, manejar(() => Registro.find().sort({ createdAt: -1 }).limit(300).lean()));
+r.post('/registros/:id/reintentar', soloSuper, manejar(async req => {
+  const g = await Registro.findOneAndUpdate({ _id: req.params.id, estado: 'error' }, { estado: 'pendiente' }, { new: true }).lean();
+  if (!g) throw new ErrorApi('Solo se reintentan registros con error', 409);
+  return sus.provisionar(g._id, { cliente: g.stripeCliente, suscripcion: g.stripeSuscripcion });
+}));
+
+module.exports = r;

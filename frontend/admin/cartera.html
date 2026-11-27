@@ -1,0 +1,28 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Katú POS</title>
+  <link rel="icon" href="../assets/img/favicon.ico">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Sora:wght@500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+  <link rel="stylesheet" href="pos-admin.css">
+</head>
+<body data-pagina="cartera">
+<main class="content"></main>
+<script src="../assets/js/motor.js"></script>
+<script src="pos-admin.js"></script>
+<script>
+(async function () {
+  if (!(await POS.listo)) return;
+
+  document.querySelector('main').innerHTML = `<div class="head"><div><h1>Fiado</h1><p id="res"></p></div></div><div class="card" id="t"></div>`;
+  async function cargar() { const d = await datos('/cartera'); if (!d) return; $('res').textContent = `Te deben ${dinero(d.reduce((a, c) => a + c.deuda, 0))} entre ${d.filter(c => c.deuda > 0).length} clientes. El cupo se define en la ficha del cliente.`; tabla($('t'), [{ t: 'Cliente', f: c => `<b>${esc(c.nombre)}</b><small>${esc(c.telefono)}</small>` }, { t: 'Cupo', n: 1, f: c => dinero(c.cupo) }, { t: 'Debe', n: 1, f: c => `<b>${dinero(c.deuda)}</b>` }, { t: 'Disponible', n: 1, f: c => dinero(Math.max(0, c.cupo - c.deuda)) }, { t: '', n: 1, f: c => c.deuda > 0 ? `<button class="btn sm" data-a="${c._id}">Abonar</button>` : '' }], d, { vacio: 'Ningún cliente tiene fiado', icono: 'fa-handshake', clic: ver }); document.querySelectorAll('[data-a]').forEach(b => { b.onclick = () => abonar(d.find(c => c._id === b.dataset.a)); }); }
+  function abonar(c) { const m = modal({ clase: 's', titulo: `Abono de ${esc(c.nombre)}`, html: '<div id="f"></div>', pie: '<button class="btn p" data-s>Registrar abono</button>' }); const f = formulario(m.q('#f'), [{ k: 'monto', l: `Valor, debe ${dinero(c.deuda)}`, t: 'numero', w: 12, req: 1, def: c.deuda }, { k: 'medio', l: 'Medio', t: 'lista', w: 12, op: POS.medios.filter(x => !['fiado', 'qr'].includes(x.tipo)).map(x => [x.codigo, x.nombre]) }, { k: 'notas', l: 'Notas', w: 12 }]); m.q('[data-s]').onclick = async () => { const o = f.validar(); if (o && await datos(`/cartera/${c._id}/abonos`, 'POST', o)) { m.cerrar(); toast('Abono registrado'); cargar(); } }; }
+  async function ver(c) { const d = await datos('/cartera/' + c._id); if (!d) return; const m = modal({ clase: 'l', titulo: `Cuenta de ${esc(c.nombre)}`, html: '<div class="card" id="k"></div>' }); tabla(m.q('#k'), [{ t: 'Fecha', f: x => fecha(x.createdAt) }, { t: 'Movimiento', f: x => `${{ cargo: 'Compra fiada', abono: 'Abono', devolucion: 'Devolución' }[x.tipo]} ${esc(x.venta?.numero || '')}<small>${esc([x.usuario?.nombre, x.notas].filter(Boolean).join(' · '))}</small>` }, { t: 'Valor', n: 1, f: x => `<span class="${x.tipo === 'cargo' ? 'baja' : 'sube'}">${x.tipo === 'cargo' ? '+' : '−'}${dinero(x.monto)}</span>` }, { t: 'Saldo', n: 1, f: x => dinero(x.saldo) }], d, { vacio: 'Sin movimientos' }); }
+  cargar();
+})();
+</script>
+</body>
+</html>

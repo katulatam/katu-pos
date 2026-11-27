@@ -1,0 +1,32 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Katú POS</title>
+  <link rel="icon" href="../assets/img/favicon.ico">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Sora:wght@500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+  <link rel="stylesheet" href="pos-admin.css">
+</head>
+<body data-pagina="medios-pago">
+<main class="content"></main>
+<script src="../assets/js/motor.js"></script>
+<script src="pos-admin.js"></script>
+<script>
+(async function () {
+  if (!(await POS.listo)) return;
+
+  let l = POS.medios.map(m => ({ ...m }));
+  document.querySelector('main').innerHTML = `<div class="head"><div><h1>Medios de pago</h1><p>Los disponibles en ${esc(POS.pais.nombre)}. Elige cuáles usas, en qué canal y en qué orden aparecen.</p></div><div class="acts"><button class="btn p" id="s">Guardar cambios</button></div></div>${POS.modoDemo ? '<div class="aviso a"><i class="fa-solid fa-flask"></i><span>Servidor en modo demo: los QR se aprueban solos si la pasarela no está configurada.</span></div>' : ''}<div class="card" id="t"></div>${POS.esSuper ? '<div class="card"><header><h3>Pasarela de pagos (solo Katú)</h3><div class="r"><button class="btn sm p" id="sp">Guardar pasarela</button></div></header><div class="b"><div id="fp"></div></div></div>' : ''}`;
+  const CN = [['caja', 'Caja'], ['domicilio', 'Domicilio'], ['kiosco', 'Kiosco']];
+  function ver() { tabla($('t'), [{ t: '', f: (m, i) => `<button class="ib" data-u="${i}" ${i ? '' : 'disabled'} aria-label="Subir"><i class="fa-solid fa-arrow-up"></i></button>` }, { t: 'Medio', f: m => `<b><i class="fa-solid ${esc(m.icono)}" style="width:26px;color:var(--primary)"></i>${esc(m.nombre)}</b><small>${{ efectivo: 'Cajón o kiosco de efectivo', qr: 'Se confirma automáticamente', datafono: 'Manual o datáfono integrado', manual: 'Confirmación manual', fiado: 'Contra el cupo del cliente' }[m.tipo]}</small>` }, { t: 'Canales', f: (m, i) => `<div class="chips">${CN.map(c => `<button class="chip ${m.canales.includes(c[0]) ? 'on' : ''}" data-c="${i}|${c[0]}">${c[1]}</button>`).join('')}</div>` }, { t: 'Activo', n: 1, f: (m, i) => `<label class="sw" style="justify-content:flex-end"><input type="checkbox" data-a="${i}" ${m.activo ? 'checked' : ''}></label>` }], l); }
+  $('t').onclick = e => { const u = e.target.closest('[data-u]'), c = e.target.closest('[data-c]'); if (u) { const i = Number(u.dataset.u); [l[i - 1], l[i]] = [l[i], l[i - 1]]; ver(); } if (c) { const [i, k] = c.dataset.c.split('|'); l[i].canales = l[i].canales.includes(k) ? l[i].canales.filter(x => x !== k) : [...l[i].canales, k]; ver(); } };
+  $('t').onchange = e => { if (e.target.dataset.a) l[e.target.dataset.a].activo = e.target.checked; };
+  $('s').onclick = async () => { const r = await datos('/configuracion/medios-pago', 'PUT', { medios: l }); if (r) { l = r; ver(); toast('Guardado'); } };
+  if (POS.esSuper) { const d = await datos('/configuracion/pasarela'); const f = formulario($('fp'), [{ k: 'url', l: 'URL de la pasarela', ph: 'Vacío = la del servidor' }, { k: 'subdominio', l: 'Subdominio (QR tarjeta)' }, { k: 'clientId', l: 'Client ID' }, { k: 'secret', l: d?.secretoConfigurado ? 'Secreto (guardado; escribe para cambiarlo)' : 'Secreto', t: 'clave' }], { ...d, secret: '' }); $('sp').onclick = async () => { if (await datos('/configuracion/pasarela', 'PUT', f.tomar())) toast('Pasarela guardada'); }; }
+  ver();
+})();
+</script>
+</body>
+</html>

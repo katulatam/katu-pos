@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <title>Domiciliarios — Katú POS</title><meta name="theme-color" content="#060B16">
+  <link rel="icon" href="../assets/img/favicon.ico">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Sora:wght@500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+  <link rel="stylesheet" href="../pos/pos.css">
+  <style>
+    body { user-select: auto; } .app { max-width: 560px; margin: 0 auto; padding: 14px 14px 60px; display: flex; flex-direction: column; gap: 14px; min-height: 100vh; } .cab { display: flex; align-items: center; gap: 12px; } .cab .d { flex: 1; } .cab b { font-family: var(--titulo); font-size: 18px; display: block; } .cab small { color: var(--t2); } .tres .panel { padding: 13px; text-align: center; } .tres .panel b { font-family: var(--titulo); font-size: 18px; display: block; } .tres { grid-template-columns: repeat(3, 1fr) !important; } .tres small { color: var(--t2); font-size: 11.5px; }
+    .pd { padding: 16px; display: flex; flex-direction: column; gap: 10px; } .pd .t { display: flex; justify-content: space-between; font-family: var(--titulo); font-weight: 700; font-size: 16px; } .pd p { color: var(--t2); line-height: 1.5; font-size: 13.5px; } .pd .dos { grid-template-columns: 1fr 1fr; } h2 { font-family: var(--titulo); font-size: 15px; } a.b2 { text-decoration: none; }
+  </style>
+</head>
+<body><div id="r"></div>
+<script src="../assets/js/motor.js"></script>
+<script>
+(function () {
+  const K = 'katu_domi_token', R = document.getElementById('r'); let D = null, vig = null, wk = null;
+  const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+  const din = n => Motor.dinero(n, D.pais);
+  async function api(u, m = 'GET', b) { try { const r = await fetch('/api/v1' + u, { method: m, headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + localStorage.getItem(K) }, body: b ? JSON.stringify(b) : undefined }); if (r.status === 401 && u !== '/auth/login') { localStorage.removeItem(K); login(); } return r.json(); } catch { return { success: false, error: 'Sin conexión' }; } }
+  let tt; function toast(m, mal) { let e = document.querySelector('.toast'); if (!e) { e = document.createElement('div'); document.body.append(e); } e.className = 'toast ver ' + (mal ? 'mal' : ''); e.textContent = m; clearTimeout(tt); tt = setTimeout(() => e.classList.remove('ver'), 3000); }
+  function ventana(t, h) { const v = document.createElement('div'); v.className = 'velo'; v.innerHTML = `<div class="vent"><header><span>${t}</span><button class="ico" data-x><i class="fa-solid fa-xmark"></i></button></header><div class="c">${h}</div></div>`; document.body.append(v); v.querySelector('[data-x]').onclick = () => v.remove(); return v; }
+  function login() {
+    clearInterval(vig); R.innerHTML = `<main class="entrada"><form class="vent"><div class="c" style="padding:28px"><div class="marca" style="font-size:21px"><i class="fa-solid fa-motorcycle"></i><b>Katú <span>Domicilios</span></b></div><div><label class="k">Correo</label><input class="in" type="email" id="c" required></div><div><label class="k">Contraseña</label><input class="in" type="password" id="p" required></div><button class="b1">Ingresar</button></div></form></main>`;
+    R.querySelector('form').onsubmit = async e => { e.preventDefault(); const r = await api('/auth/login', 'POST', { correo: R.querySelector('#c').value, password: R.querySelector('#p').value }); if (!r.success) return toast(r.error, 1); if (r.data.user.rol !== 'domiciliario') return toast('Esta cuenta no es de domiciliario', 1); localStorage.setItem(K, r.data.token); iniciar(); };
+  }
+  const nav = (p, q) => `https://www.google.com/maps/dir/?api=1&destination=${p.lat},${p.lng}${q ? '&travelmode=driving' : ''}`;
+  const tarjeta = p => `<div class="panel pd"><div class="t"><span>${esc(p.numero)}</span><span>${din(p.total)}</span></div>${p.contacto ? `<p><b style="color:var(--t)">${esc(p.contacto.nombre)}</b><br>${esc([p.entrega.direccion, p.entrega.detalle].filter(Boolean).join(', '))}${p.entrega.notas ? `<br><i>${esc(p.entrega.notas)}</i>` : ''}<br>${p.items.map(i => `${i.cantidad} ${i.unidad === 'und' ? '' : i.unidad} ${esc(i.nombre)}`).join(' · ')}</p><span class="pastilla" style="align-self:flex-start">${p.pagado ? 'Ya está pagado' : p.tipoPago === 'efectivo' ? `Cobra ${din(p.total)} en efectivo${p.pagaCon ? `, lleva cambio de ${din(p.pagaCon - p.total)}` : ''}` : `Cobra ${din(p.total)} con datáfono`}</span>` : `<p>${esc(p.sede?.nombre || '')} · a ${(p.entrega.distanciaM / 1000).toFixed(1)} km</p>`}${!p.contacto ? `<button class="b1 sm" data-t="${p._id}">Tomar pedido</button>` : p.estado === 'listo' ? `<div class="dos">${p.sede?.ubicacion?.lat ? `<a class="b2" target="_blank" rel="noopener" href="${nav(p.sede.ubicacion)}"><i class="fa-solid fa-store"></i> Ir a la tienda</a>` : ''}<button class="b1 sm" data-s="${p._id}">Salir a entregar</button></div>` : `<div class="dos"><a class="b2" target="_blank" rel="noopener" href="${nav(p.entrega, 1)}"><i class="fa-solid fa-route"></i> Navegar</a><a class="b2" href="tel:${esc(p.contacto.telefono)}"><i class="fa-solid fa-phone"></i> Llamar</a></div><button class="b1 sm" data-e="${p._id}">Entregar con PIN</button>`}</div>`;
+  async function cargar() {
+    const r = await api('/domiciliario/inicio'); if (!r.success) { if (r.error && D) toast(r.error, 1); else if (!D && localStorage.getItem(K)) { R.innerHTML = `<main class="entrada"><div class="vent"><div class="c"><p class="nota">${esc(r.error)}</p></div></div></main>`; } return; } D = r.data;
+    R.innerHTML = `<div class="app"><div class="cab"><div class="d"><b>${esc(D.usuario.nombre)}</b><small>${esc(D.empresa)}</small></div><button class="pastilla ${D.usuario.disponible ? '' : 'off'}" id="dp"><span class="pt"></span>${D.usuario.disponible ? 'Disponible' : 'En pausa'}</button><button class="ico" id="sl" aria-label="Salir"><i class="fa-solid fa-right-from-bracket"></i></button></div><div class="tres" style="display:grid;gap:10px"><div class="panel"><b>${D.hoy.n}</b><small>entregas hoy</small></div><div class="panel"><b>${D.hoy.estrellas ? D.hoy.estrellas.toFixed(1) + ' ★' : '—'}</b><small>calificación</small></div><div class="panel"><b>${din(D.porEntregar)}</b><small>por entregar en caja</small></div></div>${D.asignados.length ? `<h2>Mis pedidos</h2>${D.asignados.map(tarjeta).join('')}` : ''}${D.libres.length ? `<h2>Disponibles</h2>${D.libres.map(tarjeta).join('')}` : ''}${!D.asignados.length && !D.libres.length ? '<div class="panel vacio"><i class="fa-solid fa-mug-hot"></i>No hay pedidos por ahora.</div>' : ''}</div>`;
+    rastreo(D.asignados.some(p => p.estado === 'en_camino'));
+  }
+  // La ubicación se comparte SOLO mientras hay un pedido en camino
+  function rastreo(si) { if (!('geolocation' in navigator)) return; if (si && wk === null) { let u = 0; wk = navigator.geolocation.watchPosition(g => { if (Date.now() - u < 8000) return; u = Date.now(); api('/domiciliario/ubicacion', 'POST', { lat: g.coords.latitude, lng: g.coords.longitude }); }, () => toast('Activa la ubicación para que el cliente te vea llegar', 1), { enableHighAccuracy: true, maximumAge: 5000 }); } else if (!si && wk !== null) { navigator.geolocation.clearWatch(wk); wk = null; } }
+  R.onclick = async e => {
+    const b = e.target.closest('button'); if (!b) return; const d = b.dataset;
+    if (b.id === 'sl') { localStorage.removeItem(K); rastreo(false); return login(); }
+    if (b.id === 'dp') { await api('/domiciliario/disponible', 'PUT', { disponible: !D.usuario.disponible }); return cargar(); }
+    if (d.t || d.s) { b.disabled = true; const r = await api(`/domiciliario/pedidos/${d.t || d.s}/${d.t ? 'tomar' : 'salir'}`, 'POST', {}); if (!r.success) toast(r.error, 1); return cargar(); }
+    if (d.e) { const p = D.asignados.find(x => x._id === d.e); const v = ventana(`Entregar ${esc(p.numero)}`, `${!p.pagado ? `<p class="nota">Recibe <b style="color:var(--t)">${din(p.total)}</b> ${p.tipoPago === 'efectivo' ? 'en efectivo' : 'con datáfono'}.</p>` : ''}<input class="in gr" id="pn" inputmode="numeric" maxlength="4" placeholder="PIN">${p.tipoPago === 'datafono' ? '<input class="in" id="rf" placeholder="Código de autorización">' : ''}<button class="b1" id="ok">Confirmar entrega</button>`); v.querySelector('#pn').focus(); v.querySelector('#ok').onclick = async x => { x.target.disabled = true; const r = await api(`/domiciliario/pedidos/${p._id}/entregar`, 'POST', { pin: v.querySelector('#pn').value, referencia: v.querySelector('#rf')?.value }); x.target.disabled = false; if (!r.success) return toast(r.error, 1); v.remove(); toast('Entrega confirmada'); cargar(); }; }
+  };
+  function iniciar() { cargar(); clearInterval(vig); vig = setInterval(() => { if (!document.querySelector('.velo')) cargar(); }, 10000); }
+  localStorage.getItem(K) ? iniciar() : login();
+})();
+</script></body>
+</html>

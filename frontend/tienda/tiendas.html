@@ -1,0 +1,27 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <title>Katú</title>
+  <link rel="icon" href="/assets/img/favicon.ico">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Sora:wght@600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
+  <link rel="stylesheet" href="/tienda/tienda.css">
+</head>
+<body>
+<header class="cab"><div><div class="logo"><i class="fa-solid fa-bolt"></i></div><div class="sp"><h1>Tiendas cerca de ti</h1></div><button class="pill ubi" id="ub"><i class="fa-solid fa-location-dot"></i><span>¿Dónde estás?</span></button></div></header><main style="max-width:760px"><div id="l"></div></main>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+<script src="/assets/js/motor.js"></script><script src="/tienda/tienda.js"></script>
+<script>
+(async function () {
+  async function ver() {
+    const l = lugar.leer(); if (l) $('ub').querySelector('span').textContent = l.direccion;
+    const r = await api('/tienda/cercanas' + (l ? `?lat=${l.lat}&lng=${l.lng}` : '')); if (!r.success) return toast(r.error);
+    $('l').innerHTML = (l ? '' : '<div class="av i"><i class="fa-solid fa-location-dot"></i><span>Marca tu ubicación para ver qué tiendas llegan a tu casa.</span></div>') + (r.data.map(t => `<a class="caja ln" style="text-decoration:none;color:inherit;border-bottom:1px solid var(--l)" href="/t/${esc(t.slug)}"><div class="logo" style="background:${esc(t.color)}">${logo(t)}</div><span class="d"><b>${esc(t.nombre)}</b><small>${esc(t.ciudad || '')}${t.cobertura.cubre ? ` · ${(t.cobertura.distancia / 1000).toFixed(1)} km · ${t.cobertura.minutos} min` : t.recoger ? ' · recoge en tienda' : ''}</small></span><span class="ch">${t.cobertura.cubre ? (t.cobertura.abierta ? 'Llega a tu casa' : 'Cerrado') : 'Sin cobertura'}</span></a>`).join('') || '<div class="caja">Aún no hay tiendas disponibles.</div>');
+  }
+  $('ub').onclick = async () => { if (await elegirLugar(lugar.leer())) ver(); }; ver();
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,44 @@
+{
+  "expo": {
+    "name": "Katú Market",
+    "slug": "katu-market",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "automatic",
+    "scheme": "katumarket",
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "me.katu.market",
+      "infoPlist": {
+        "NSLocationWhenInUseUsageDescription": "Usamos tu ubicación para saber qué tiendas llegan a tu casa y, si eres domiciliario, para que el cliente vea por dónde vas."
+      }
+    },
+    "android": {
+      "package": "me.katu.market",
+      "adaptiveIcon": {
+        "backgroundColor": "#060B16",
+        "foregroundImage": "./assets/android-icon-foreground.png",
+        "backgroundImage": "./assets/android-icon-background.png",
+        "monochromeImage": "./assets/android-icon-monochrome.png"
+      },
+      "permissions": [
+        "ACCESS_COARSE_LOCATION",
+        "ACCESS_FINE_LOCATION"
+      ]
+    },
+    "web": {
+      "favicon": "./assets/favicon.png"
+    },
+    "plugins": [
+      "expo-secure-store",
+      [
+        "expo-location",
+        {
+          "locationWhenInUsePermission": "Usamos tu ubicación para mostrarte las tiendas que llegan a tu casa."
+        }
+      ],
+      "expo-font"
+    ]
+  }
+}

@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Visor del cliente — Katú POS</title>
+  <link rel="icon" href="../assets/img/favicon.ico">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Sora:wght@500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+  <link rel="stylesheet" href="pos.css">
+</head>
+<body>
+<main class="visor" id="v"><div class="panel tl"><div class="marca"><i class="fa-solid fa-bolt"></i></div><div class="gr" style="font-size:56px">Bienvenido</div></div><div class="panel ls"></div></main>
+<script src="base.js"></script>
+<script>
+  // Segunda pantalla: escucha a la caja abierta en este mismo computador
+  const canal = new BroadcastChannel('katu_pos_visor:' + (new URLSearchParams(location.search).get('caja') || localStorage.getItem('katu_pos_caja')));
+  const v = $('v'); let ult = [];
+  const dos = (iz, de) => { v.innerHTML = `<div class="panel tl">${iz}</div><div class="panel ls">${de}</div>`; };
+  const lista = () => ult.slice(0, 9).reverse().map(l => `<div class="lin" style="font-size:17px"><span class="q" style="display:grid;place-items:center">${esc(l.q)}</span><span class="n" style="font-size:16px">${esc(l.n)}</span><span class="v" style="font-size:17px">${esc(l.v)}</span></div>`).join('');
+  canal.onmessage = ({ data: d }) => {
+    if (d.lineas) ult = d.lineas;
+    const logo = d.logo ? `<img src="${esc(d.logo)}" alt="" style="max-height:90px">` : `<div class="marca" style="font-size:26px">${esc(d.empresa)}</div>`;
+    if (d.tipo === 'espera') { ult = []; dos(`${logo}<div class="gr" style="font-size:64px">Bienvenido</div><p class="nota" style="font-size:17px">Acumula puntos en cada compra</p>`, ''); }
+    else if (d.tipo === 'venta') dos(`${logo}${d.cliente ? `<p class="nota" style="font-size:18px">Hola, ${esc(d.cliente)}${d.puntos != null ? ` · ${d.puntos} puntos` : ''}</p>` : ''}<div class="gr">${esc(d.total)}</div>${d.ahorro ? `<p class="nota bien" style="font-size:20px;font-weight:700">Ahorras ${esc(d.ahorro)}</p>` : ''}`, lista());
+    else if (d.tipo === 'cobro') dos(`${logo}<p class="nota" style="font-size:18px">Total a pagar</p><div class="gr">${esc(d.total)}</div><p class="nota" style="font-size:18px">${esc(d.medio)}</p>`, lista());
+    else if (d.tipo === 'qr') dos(`<p class="nota" style="font-size:18px">${esc(d.medio)}</p><div class="gr" style="font-size:70px">${esc(d.total)}</div>${d.qr ? `<div class="qr"><img src="${esc(d.qr)}" alt="" style="width:min(44vh,420px)"></div>` : '<div class="girando"></div>'}<p class="nota" style="font-size:18px">${esc(d.texto)}</p>`, lista());
+    else if (d.tipo === 'listo') dos(`<div class="listo c" style="display:flex;flex-direction:column"><div class="ok"><i class="fa-solid fa-check"></i></div><div class="gr" style="font-size:54px">¡Gracias${d.cliente ? ', ' + esc(d.cliente.split(' ')[0]) : ''}!</div>${d.cambio ? `<p class="nota" style="font-size:22px">Cambio <b>${esc(d.cambio)}</b></p>` : ''}${d.puntos ? `<span class="logro" style="font-size:18px"><i class="fa-solid fa-star"></i>+${d.puntos} puntos</span>` : ''}${d.nivel ? `<span class="logro" style="font-size:18px"><i class="fa-solid fa-arrow-up"></i>Nivel ${esc(d.nivel)}</span>` : ''}</div>`, '');
+    else if (d.tipo === 'ruleta' || d.tipo === 'giro') {
+      const n = d.premios.length, a = 2 * Math.PI / n;
+      if (d.tipo === 'ruleta') {
+        dos(`<div class="ruleta" style="width:min(62vh,540px);height:min(62vh,540px)"><canvas width="600" height="600"></canvas></div><div class="gr" id="rz" style="font-size:40px;min-height:50px">¡A girar!</div>`, '');
+        const x = v.querySelector('canvas').getContext('2d');
+        d.premios.forEach((p, i) => { x.beginPath(); x.moveTo(300, 300); x.arc(300, 300, 290, i * a - Math.PI / 2, (i + 1) * a - Math.PI / 2); x.fillStyle = p.color; x.fill(); x.save(); x.translate(300, 300); x.rotate((i + .5) * a - Math.PI / 2); x.fillStyle = '#fff'; x.font = '700 30px Sora'; x.textAlign = 'right'; x.textBaseline = 'middle'; x.fillText(p.nombre, 272, 0); x.restore(); });
+      } else { const c = v.querySelector('canvas'); if (c) { c.style.transform = `rotate(${d.giro}deg)`; setTimeout(() => { const r = $('rz'); if (r) r.textContent = d.puntos ? `¡Ganaste ${d.premio}!` : d.premio; }, 4300); } }
+    }
+  };
+</script>
+</body>
+</html>

@@ -1,0 +1,1 @@
+{ "name": "Katú POS", "short_name": "Katú POS", "start_url": "/pos/", "scope": "/pos/", "display": "fullscreen", "background_color": "#060B16", "theme_color": "#060B16", "icons": [{ "src": "/assets/img/logo.png", "sizes": "any", "type": "image/png" }] }

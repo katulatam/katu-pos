@@ -1,0 +1,30 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Katú POS</title>
+  <link rel="icon" href="../assets/img/favicon.ico">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Sora:wght@500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+  <link rel="stylesheet" href="pos-admin.css">
+</head>
+<body data-pagina="promociones">
+<main class="content"></main>
+<script src="../assets/js/motor.js"></script>
+<script src="pos-admin.js"></script>
+<script>
+(async function () {
+  if (!(await POS.listo)) return;
+
+  const [cats, prods] = await Promise.all([datos('/categorias'), datos('/productos?estado=activos&limite=2000')]);
+  const tx = p => p.tipo === 'porcentaje' ? `${p.valor}% de descuento` : p.tipo === 'nxm' ? `Lleva ${p.lleva}, paga ${p.paga}` : `Precio especial ${dinero(p.valor)}`;
+  crud({ ruta: '/promociones', titulo: 'Promociones', sub: 'Se aplican solas en caja, tienda en línea y app. Si coinciden varias, gana la mejor para el cliente.', nuevo: 'Nueva promoción', icono: 'fa-tags', clase: 'l',
+    columnas: [{ t: 'Promoción', f: p => `<b>${esc(p.nombre)}</b><small>${tx(p)}</small>` }, { t: 'Aplica a', f: p => p.alcance === 'todo' ? 'Toda la tienda' : `${p.objetivos.length} ${p.alcance === 'producto' ? 'productos' : 'categorías'}` }, { t: 'Vigencia', f: p => `${p.desde || 'Siempre'}${p.hasta ? ' a ' + p.hasta : ''}<small>${(p.dias || []).map(d => DIAS[d]).join(' ')} ${p.horaDesde ? `${p.horaDesde}–${p.horaHasta || ''}` : ''}</small>` }, { t: 'Estado', f: p => si(p.activo, 'Activa', 'Inactiva') }],
+    campos: [{ k: 'nombre', l: 'Nombre', w: 8, req: 1 }, { k: 'tipo', l: 'Tipo', t: 'lista', w: 4, op: [['porcentaje', 'Porcentaje'], ['nxm', 'Lleva N paga M'], ['precio', 'Precio especial']] }, { k: 'valor', l: 'Valor (% o precio)', t: 'numero', w: 4, si: o => o.tipo !== 'nxm' }, { k: 'lleva', l: 'Lleva', t: 'numero', w: 4, def: 3, si: o => o.tipo === 'nxm' }, { k: 'paga', l: 'Paga', t: 'numero', w: 4, def: 2, si: o => o.tipo === 'nxm' }, { k: 'alcance', l: 'Aplica a', t: 'lista', w: 4, op: [['producto', 'Productos'], ['categoria', 'Categorías'], ['todo', 'Toda la tienda']] }, { k: 'prod', l: 'Productos (Ctrl para varios)', t: 'multi', w: 12, op: prods.items.map(p => [p._id, p.nombre]), si: o => o.alcance === 'producto' }, { k: 'cat', l: 'Categorías', t: 'multi', w: 12, op: cats.map(c => [c._id, c.nombre]), si: o => o.alcance === 'categoria' }, { k: 'desde', l: 'Desde', t: 'fecha', w: 3 }, { k: 'hasta', l: 'Hasta', t: 'fecha', w: 3 }, { k: 'horaDesde', l: 'Hora inicial', t: 'hora', w: 3 }, { k: 'horaHasta', l: 'Hora final', t: 'hora', w: 3 }, { k: 'dias', l: 'Días (ninguno = todos)', t: 'dias' }, { k: 'activo', l: 'Activa', t: 'si', def: true }],
+    alAbrir: (x, f, fm) => { const s = new Set((f?.objetivos || []).map(String)); ['prod', 'cat'].forEach(k => [...fm.campo(k).options].forEach(o => { o.selected = s.has(o.value); })); },
+    preparar: o => { o.objetivos = o.alcance === 'producto' ? o.prod : o.alcance === 'categoria' ? o.cat : []; delete o.prod; delete o.cat; return o; } }).cargar();
+})();
+</script>
+</body>
+</html>

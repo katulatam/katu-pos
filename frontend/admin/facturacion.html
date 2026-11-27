@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Katú POS</title>
+  <link rel="icon" href="../assets/img/favicon.ico">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Sora:wght@500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+  <link rel="stylesheet" href="pos-admin.css">
+</head>
+<body data-pagina="facturacion">
+<main class="content"></main>
+<script src="../assets/js/motor.js"></script>
+<script src="pos-admin.js"></script>
+<script>
+(async function () {
+  if (!(await POS.listo)) return;
+
+  async function cargar() {
+    const d = await datos('/facturacion'); if (!d) return; const r = d.resolucion, P = POS.pais, adm = POS.esSuper || POS.user.rol === 'admin';
+    const M = document.querySelector('main');
+    if (!d.paisDisponible) { M.innerHTML = `<div class="head"><div><h1>Facturación electrónica</h1></div></div><div class="card"><div class="nada"><i class="fa-solid fa-file-invoice"></i>La facturación electrónica de ${esc(P.nombre)} (${esc(P.facturacion.entidad)}) no está disponible desde Katú POS.<br>Las ventas se registran con comprobante interno.</div></div>`; return; }
+    const resu = await datos('/facturacion/resumen?desde=' + masDias(hoy(), -29) + '&hasta=' + hoy()) || [];
+    const dias = r ? Math.round((new Date(r.fechaFin) - new Date(hoy())) / 86400000) : null;
+    M.innerHTML = `<div class="head"><div><h1>Facturación electrónica</h1><p>${esc(P.facturacion.nombreDocumento)} ante la ${esc(P.facturacion.entidad)}${d.sandbox ? ' · ambiente de pruebas' : ''}</p></div><div class="acts"><a class="btn" href="ventas.html?documento=error">Ver documentos con error</a></div></div>
+    ${!d.servidorListo ? '<div class="aviso m"><i class="fa-solid fa-plug-circle-xmark"></i><span>El servidor no tiene credenciales de facturación: no se emitirá ningún documento.</span></div>' : ''}
+    ${d.activa && !r ? '<div class="aviso a"><i class="fa-solid fa-triangle-exclamation"></i><span>Falta registrar la resolución de numeración.</span></div>' : ''}
+    ${r && dias <= 30 ? `<div class="aviso a"><i class="fa-solid fa-calendar-xmark"></i><span>${dias < 0 ? 'La resolución venció' : `La resolución vence en ${dias} días`}. Solicita una nueva.</span></div>` : ''}${d.porcentajeUsado >= 90 ? `<div class="aviso a"><i class="fa-solid fa-gauge-high"></i><span>Usaste el ${d.porcentajeUsado}% del rango autorizado.</span></div>` : ''}
+    <div class="kpis"><div class="kpi"><div class="k">Estado</div><div class="v" style="font-size:20px">${d.activa ? 'Activa' : 'Inactiva'}</div><div class="s">${esc(d.razonSocial || 'Sin emisor')} ${esc(d.idFiscal || '')}</div></div>${resu.filter(x => x._id && x._id !== 'no_aplica').map(x => `<div class="kpi"><div class="k">${DOC[x._id]?.[0] || x._id}</div><div class="v">${fnum(x.n)}</div><div class="s">${dinero(x.total)} en 30 días</div></div>`).join('')}</div>
+    <div class="mitad"><div class="card"><header><h3>Resolución de numeración</h3>${adm ? '<div class="r"><button class="btn sm" id="tr">Traer de la entidad</button></div>' : ''}</header><div class="b"><div id="fr"></div>${adm ? '<button class="btn p" id="gr">Guardar resolución</button>' : ''}</div></div>
+    <div class="card"><header><h3>Opciones</h3></header><div class="b"><label class="sw"><input type="checkbox" id="cf" ${d.facturarConsumidorFinal ? 'checked' : ''} ${adm ? '' : 'disabled'}> Facturar también a ${esc(P.consumidorFinal.nombre)}</label><p style="color:var(--muted);line-height:1.6;font-size:13px">Si lo apagas, solo se emite factura cuando el cliente la pide a su nombre. La obligación de facturar es responsabilidad tributaria de tu empresa.</p></div></div></div>
+    ${POS.esSuper ? `<div class="card"><header><h3>Emisor (solo Katú)</h3><div class="r"><button class="btn sm" id="ev">Vincular existente</button><button class="btn sm" id="ec">Crear emisor</button><button class="btn sm" id="eh">Habilitar</button><button class="btn sm" id="ew">Registrar webhook</button></div></header><div class="b"><p>Emisor: <b>${esc(d.razonSocial || 'sin vincular')}</b> · habilitación: <span class="bd ${d.estadoHabilitacion === 'AUTHORIZED' ? 'ok' : 'av'}">${esc(d.estadoHabilitacion || 'sin enviar')}</span></p><div id="fk"></div><button class="btn p" id="ga">Guardar</button></div></div>` : ''}`;
+    const fr = formulario($('fr'), [{ k: 'numero', l: 'Número de resolución', req: 1 }, { k: 'prefijo', l: 'Prefijo' }, { k: 'desde', l: 'Desde', t: 'numero' }, { k: 'hasta', l: 'Hasta', t: 'numero' }, { k: 'fechaInicio', l: 'Vigente desde', t: 'fecha' }, { k: 'fechaFin', l: 'Vigente hasta', t: 'fecha' }, { k: 'claveTecnica', l: r?.claveConfigurada ? 'Clave técnica (guardada)' : 'Clave técnica' }, { k: 'siguiente', l: 'Siguiente número', t: 'numero', nulo: 1, ayuda: 'Dentro de la misma resolución solo avanza' }], { ...(r || {}), siguiente: d.siguienteNumero || '' });
+    if (adm) {
+      $('gr').onclick = async () => { const o = fr.validar(); if (!o) return; const { siguiente, ...res } = o; const igual = r && r.numero === res.numero && Number(siguiente) === d.siguienteNumero; if (await datos('/facturacion/resolucion', 'PUT', { resolucion: res, siguienteNumero: igual ? '' : siguiente })) { toast('Resolución guardada'); cargar(); } };
+      $('tr').onclick = async () => { const l = await datos('/facturacion/resoluciones'); if (!l) return; const m = modal({ titulo: 'Resoluciones', html: '<div class="card" id="x"></div>' }); tabla(m.q('#x'), [{ t: 'Resolución', f: x => `<b>${esc(x.resolutionNumber)}</b><small>${esc(x.prefix || '')} ${x.minNumber ?? x.fromNumber ?? ''}–${x.maxNumber ?? x.toNumber ?? ''}</small>` }], l, { clic: x => { m.cerrar(); const v = { numero: x.resolutionNumber, prefijo: x.prefix, desde: x.minNumber ?? x.fromNumber, hasta: x.maxNumber ?? x.toNumber, fechaInicio: String(x.startDate || x.validDateFrom || '').slice(0, 10), fechaFin: String(x.endDate || x.validDateTo || '').slice(0, 10), claveTecnica: x.technicalKey }; Object.entries(v).forEach(([k, y]) => { fr.campo(k).value = y ?? ''; }); } }); };
+      $('cf').onchange = async e => { if (await datos('/configuracion', 'PUT', { facturacion: { facturarConsumidorFinal: e.target.checked } })) toast('Guardado'); };
+    }
+    if (POS.esSuper) {
+      const fk = formulario($('fk'), [{ k: 'activa', l: 'Facturación activa', t: 'si', w: 4 }, { k: 'prefijoNotaCredito', l: 'Prefijo notas crédito', w: 4 }, { k: 'siguienteNotaCredito', l: 'Siguiente nota crédito', t: 'numero', w: 4 }], d);
+      $('ga').onclick = async () => { if (await datos('/facturacion/activar', 'PUT', fk.tomar())) { toast('Guardado'); cargar(); } };
+      $('ev').onclick = async () => { const l = await datos('/facturacion/emisores'); if (!l) return; const m = modal({ titulo: 'Vincular emisor', html: '<div class="card" id="x"></div>' }); tabla(m.q('#x'), [{ t: 'Emisor', f: x => `<b>${esc(x.nombre)}</b><small>${esc(x.idFiscal)}</small>` }, { t: '', f: x => si(x.habilitada, 'Habilitada', 'Sin habilitar') }], l, { clic: async x => { if (await confirmar('Vincular emisor', `${x.nombre} emitirá las facturas de ${POS.empresa.nombre}.`, 'Vincular') && await datos('/facturacion/emisores', 'PUT', { id: x.id })) { m.cerrar(); cargar(); } } }); };
+      $('ec').onclick = async () => { const [dp, mu] = [await datos('/facturacion/tabla/departments'), await datos('/facturacion/tabla/municipalities')]; if (!dp || !mu) return; const cod = x => x.code || x.id, nom = x => x.name || x.value || x.description; const m = modal({ clase: 'l', titulo: 'Crear emisor', html: '<div id="f"></div>', pie: '<button class="btn p" data-s>Crear</button>' }); const f = formulario(m.q('#f'), [{ k: 'tipoPersona', l: 'Tipo', t: 'lista', op: [['juridica', 'Persona jurídica'], ['natural', 'Persona natural']] }, { k: 'idFiscal', l: 'NIT o cédula', req: 1 }, { k: 'nombre', l: 'Razón social', req: 1 }, { k: 'nombreComercial', l: 'Nombre comercial' }, { k: 'correo', l: 'Correo', req: 1 }, { k: 'telefono', l: 'Teléfono' }, { k: 'direccion', l: 'Dirección', req: 1 }, { k: 'departamento', l: 'Departamento', t: 'lista', op: dp.map(x => [cod(x), nom(x)]) }, { k: 'ciudad', l: 'Municipio', t: 'lista', op: mu.map(x => [cod(x), nom(x)]) }], { ...POS.empresa, nombre: POS.empresa.razonSocial, nombreComercial: POS.empresa.nombre }); m.q('[data-s]').onclick = async () => { const o = f.validar(); if (o && await datos('/facturacion/emisores', 'POST', o)) { m.cerrar(); toast('Emisor creado'); cargar(); } }; };
+      $('eh').onclick = () => { const m = modal({ clase: 's', titulo: 'Habilitar ante la entidad', html: '<div id="f"></div>', pie: '<button class="btn p" data-s>Enviar set de pruebas</button>' }); const f = formulario(m.q('#f'), [{ k: 'testSetId', l: 'TestSetId', w: 12, req: 1 }]); m.q('[data-s]').onclick = async () => { const o = f.validar(); if (!o) return; const x = await datos('/facturacion/habilitar', 'POST', o); if (x) { m.cerrar(); toast('Estado: ' + (x.estado || 'enviado')); cargar(); } }; };
+      $('ew').onclick = async () => { const x = await datos('/facturacion/registrar-webhook', 'POST', {}); if (x) toast('Webhook registrado'); };
+    }
+  }
+  cargar();
+})();
+</script>
+</body>
+</html>

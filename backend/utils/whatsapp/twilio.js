@@ -1,0 +1,125 @@
+const crypto = require('crypto');
+const axios = require('axios');
+
+// ── Twilio (WhatsApp) — modelo de subcuentas ───────────────────────────────
+// Katú tiene UNA cuenta maestra (TWILIO_ACCOUNT_SID / TWILIO_AUTH_TOKEN en el
+// .env) y crea una subcuenta por comercio con su número. El token de cada
+// subcuenta se consulta con la maestra y vive solo en memoria: nunca en la BD.
+// Sin credenciales y fuera de producción funciona un SIMULADOR (no envía nada)
+// para desarrollar y probar.
+const API = 'https://api.twilio.com/2010-04-01';
+const MSG = 'https://messaging.twilio.com/v1';
+
+const maestra = () => ({ sid: String(process.env.TWILIO_ACCOUNT_SID || '').trim(), token: String(process.env.TWILIO_AUTH_TOKEN || '').trim() });
+const simulado = () => !maestra().sid && process.env.NODE_ENV !== 'production';
+const disponible = () => !!maestra().sid || simulado();
+
+class ErrorTwilio extends Error {
+  constructor(m, status = 502) { super(m); this.status = status; }
+}
+
+async function llamar(cred, metodo, url, datos) {
+  try {
+    const { data } = await axios({
+      method: metodo, url, timeout: 20000, auth: { username: cred.sid, password: cred.token },
+      ...(datos && { data: new URLSearchParams(Object.entries(datos).filter(([, v]) => v != null && v !== '')).toString(), headers: { 'Content-Type': 'application/x-www-form-urlencoded' } }),
+    });
+    return data;
+  } catch (e) {
+    const d = e.response?.data;
+    throw new ErrorTwilio(`WhatsApp (${e.response?.status || 'sin respuesta'}): ${d?.message || e.message}${d?.code ? ` [${d.code}]` : ''}`, e.response?.status >= 400 && e.response?.status < 500 ? 400 : 502);
+  }
+}
+
+// Token de la subcuenta, en memoria por 1 hora
+const tokens = new Map();
+async function credSub(subSid) {
+  if (simulado()) return { sid: subSid, token: 'simulado' };
+  const c = tokens.get(subSid);
+  if (c && c.hasta > Date.now()) return c.cred;
+  const a = await llamar(maestra(), 'get', `${API}/Accounts/${subSid}.json`);
+  if (!a?.auth_token) throw new ErrorTwilio('No se pudo leer la subcuenta de WhatsApp');
+  const cred = { sid: subSid, token: a.auth_token };
+  tokens.set(subSid, { cred, hasta: Date.now() + 3600000 });
+  return cred;
+}
+
+// Alta: subcuenta + Messaging Service que apunta a nuestros webhooks
+async function crearSubcuenta(nombre, { entrante, estado }) {
+  if (simulado()) return { subcuentaSid: 'ACsim' + crypto.randomBytes(15).toString('hex'), servicioSid: 'MGsim' + crypto.randomBytes(15).toString('hex') };
+  const a = await llamar(maestra(), 'post', `${API}/Accounts.json`, { FriendlyName: `Katú · ${nombre}`.slice(0, 64) });
+  const cred = { sid: a.sid, token: a.auth_token };
+  tokens.set(a.sid, { cred, hasta: Date.now() + 3600000 });
+  const s = await llamar(cred, 'post', `${MSG}/Services`, { FriendlyName: `WhatsApp ${nombre}`.slice(0, 64), InboundRequestUrl: entrante, InboundMethod: 'POST', StatusCallback: estado, UseInboundWebhookOnNumber: 'false' });
+  return { subcuentaSid: a.sid, servicioSid: s.sid };
+}
+// Revisa que el número ya esté agregado al servicio (el registro del remitente
+// de WhatsApp lo aprueba Meta y se hace en la consola de Twilio)
+async function verificarNumero(subSid, servicioSid, numero) {
+  if (simulado()) return true;
+  const cred = await credSub(subSid);
+  const r = await llamar(cred, 'get', `${MSG}/Services/${servicioSid}/PhoneNumbers?PageSize=50`).catch(() => null);
+  const s = await llamar(cred, 'get', `${MSG}/Services/${servicioSid}/ChannelSenders?PageSize=50`).catch(() => null);
+  const lista = [...(r?.phone_numbers || []).map(x => x.phone_number), ...(s?.senders || []).map(x => String(x.sender || '').replace(/^whatsapp:/, ''))];
+  return lista.includes(numero);
+}
+
+async function enviar({ subcuentaSid, servicioSid, numero }, { a, texto, plantilla, variables, aviso }) {
+  if (simulado()) return { sid: 'SMsim' + crypto.randomBytes(15).toString('hex'), estado: 'entregado' };
+  const cred = await credSub(subcuentaSid);
+  const d = await llamar(cred, 'post', `${API}/Accounts/${subcuentaSid}/Messages.json`, {
+    To: `whatsapp:${a}`, ...(servicioSid ? { MessagingServiceSid: servicioSid } : { From: `whatsapp:${numero}` }),
+    ...(plantilla ? { ContentSid: plantilla, ContentVariables: JSON.stringify(variables || {}) } : { Body: texto }),
+    StatusCallback: aviso,
+  });
+  return { sid: d.sid, estado: d.status === 'failed' ? 'fallido' : 'enviado' };
+}
+
+// Firma X-Twilio-Signature: HMAC-SHA1 de la URL + parámetros ordenados, con el token de la subcuenta
+async function firmaValida(subSid, url, params, firma) {
+  if (simulado()) return true;
+  if (!firma) return false;
+  const { token } = await credSub(subSid);
+  const base = url + Object.keys(params).sort().map(k => k + params[k]).join('');
+  const esperada = crypto.createHmac('sha1', token).update(Buffer.from(base, 'utf8')).digest('base64');
+  const a = Buffer.from(esperada), b = Buffer.from(String(firma));
+  return a.length === b.length && crypto.timingSafeEqual(a, b);
+}
+
+// Las imágenes que manda el cliente se descargan con las credenciales de la subcuenta
+async function descargar(subSid, url) {
+  if (!/^https:\/\/api\.twilio\.com\//.test(url)) throw new ErrorTwilio('Archivo no válido', 400);
+  const cred = await credSub(subSid);
+  const r = await axios.get(url, { responseType: 'arraybuffer', timeout: 20000, maxContentLength: 16 * 1024 * 1024, auth: { username: cred.sid, password: cred.token } });
+  return { datos: r.data, tipo: r.headers['content-type'] || 'application/octet-stream' };
+}
+
+// ── Plantillas (Content API) y aprobación de Meta ──────────────────────────
+const CONTENT = 'https://content.twilio.com/v1';
+async function llamarJSON(cred, metodo, url, datos) {
+  try {
+    const { data } = await axios({ method: metodo, url, timeout: 20000, auth: { username: cred.sid, password: cred.token }, ...(datos && { data: datos, headers: { 'Content-Type': 'application/json' } }) });
+    return data;
+  } catch (e) {
+    const d = e.response?.data;
+    throw new ErrorTwilio(`WhatsApp (${e.response?.status || 'sin respuesta'}): ${d?.message || e.message}${d?.code ? ` [${d.code}]` : ''}`, e.response?.status >= 400 && e.response?.status < 500 ? 400 : 502);
+  }
+}
+// cuerpo con {{1}} = nombre del cliente. nombre: identificador en minúsculas y guiones bajos
+async function crearPlantilla(subSid, { nombre, cuerpo }) {
+  if (simulado()) return { contentSid: 'HX' + crypto.randomBytes(16).toString('hex') };
+  const cred = await credSub(subSid);
+  const c = await llamarJSON(cred, 'post', `${CONTENT}/Content`, { friendly_name: nombre, language: 'es', variables: { 1: 'Cliente' }, types: { 'twilio/text': { body: cuerpo } } });
+  await llamarJSON(cred, 'post', `${CONTENT}/Content/${c.sid}/ApprovalRequests/whatsapp`, { name: nombre, category: 'MARKETING' });
+  return { contentSid: c.sid };
+}
+// → { estado: aprobada | pendiente | rechazada, motivo }
+async function estadoPlantilla(subSid, contentSid) {
+  if (simulado()) return { estado: 'aprobada' };
+  const cred = await credSub(subSid);
+  const r = await llamarJSON(cred, 'get', `${CONTENT}/Content/${contentSid}/ApprovalRequests`);
+  const s = String(r?.whatsapp?.status || '').toLowerCase();
+  return { estado: s === 'approved' ? 'aprobada' : ['rejected', 'paused', 'disabled'].includes(s) ? 'rechazada' : 'pendiente', motivo: r?.whatsapp?.rejection_reason || '' };
+}
+
+module.exports = { disponible, simulado, crearSubcuenta, verificarNumero, enviar, firmaValida, descargar, crearPlantilla, estadoPlantilla, ErrorTwilio };

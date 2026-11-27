@@ -1,0 +1,27 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Katú POS</title>
+  <link rel="icon" href="../assets/img/favicon.ico">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Sora:wght@500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+  <link rel="stylesheet" href="pos-admin.css">
+</head>
+<body data-pagina="categorias">
+<main class="content"></main>
+<script src="../assets/js/motor.js"></script>
+<script src="pos-admin.js"></script>
+<script>
+(async function () {
+  if (!(await POS.listo)) return;
+
+  const IC = ['fa-box', 'fa-bottle-water', 'fa-carrot', 'fa-apple-whole', 'fa-cheese', 'fa-bread-slice', 'fa-cookie-bite', 'fa-jar', 'fa-soap', 'fa-drumstick-bite', 'fa-fish', 'fa-ice-cream', 'fa-wine-bottle', 'fa-mug-hot', 'fa-baby', 'fa-paw', 'fa-pills', 'fa-pen', 'fa-shirt', 'fa-plug', 'fa-lightbulb', 'fa-smoking', 'fa-candy-cane', 'fa-egg', 'fa-lemon', 'fa-pump-soap', 'fa-gift', 'fa-star'];
+  crud({ ruta: '/categorias', titulo: 'Categorías', sub: 'Organizan el riel de la caja y la tienda en línea.', nuevo: 'Nueva categoría', icono: 'fa-layer-group',
+    columnas: [{ t: 'Categoría', f: c => `<b><i class="fa-solid ${esc(c.icono)}" style="color:${esc(c.color)};width:26px"></i>${esc(c.nombre)}</b>` }, { t: 'Orden', n: 1, f: c => c.orden }, { t: 'En línea', f: c => si(c.enLinea, 'Visible', 'Oculta') }, { t: 'Estado', f: c => si(c.activo, 'Activa', 'Inactiva') }],
+    campos: [{ k: 'nombre', l: 'Nombre', req: 1 }, { k: 'icono', l: 'Ícono', t: 'lista', op: IC.map(i => [i, i.replace('fa-', '').replace(/-/g, ' ')]) }, { k: 'color', l: 'Color', t: 'color' }, { k: 'orden', l: 'Orden', t: 'numero', def: 0 }, { k: 'enLinea', l: 'Mostrar en la tienda en línea', t: 'si', def: true }, { k: 'activo', l: 'Activa', t: 'si', def: true }] }).cargar();
+})();
+</script>
+</body>
+</html>

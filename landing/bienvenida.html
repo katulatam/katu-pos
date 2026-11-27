@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>¡Bienvenido a Katú POS!</title>
+  <meta name="robots" content="noindex">
+  <meta name="theme-color" content="#060B16">
+  <link rel="icon" href="img/favicon.ico">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Sora:wght@500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+  <link rel="stylesheet" href="estilos.css">
+</head>
+<body>
+<main class="bienvenida">
+  <div class="aurora" aria-hidden="true"><span></span><span></span><span></span></div>
+  <div class="bv-tarjeta" id="t">
+    <div class="bv-ic"><div class="girando"></div></div>
+    <h1>Estamos creando tu negocio…</h1>
+    <p>Tu pago fue recibido. Esto toma solo unos segundos.</p>
+  </div>
+</main>
+<div class="confeti" id="confeti" aria-hidden="true"></div>
+<script src="config.js"></script>
+<script>
+(function () {
+  const K = window.KATU || {}, t = document.getElementById('t');
+  const id = new URLSearchParams(location.search).get('r') || sessionStorage.getItem('katu_registro');
+  const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+  const marca = '<a href="index.html" class="marca" style="justify-content:center;margin-top:26px"><span class="marca-ic"><i class="fa-solid fa-bolt"></i></span>Katú <b>POS</b></a>';
+  if (!id) { t.innerHTML = `<div class="bv-ic"><i class="fa-solid fa-circle-question"></i></div><h1>No encontramos tu registro</h1><p>Si ya pagaste, revisa tu correo: ahí te llega el enlace para entrar. Si necesitas ayuda escríbenos a ${esc(K.CONTACTO || 'hola@katupos.com')}.</p>${marca}`; return; }
+  function confeti() {
+    if (matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+    const c = document.getElementById('confeti'), col = ['#05C3DD', '#7C6CFF', '#2EE6A6', '#FFB547', '#FF5D9E'];
+    for (let i = 0; i < 90; i++) { const p = document.createElement('i'); p.style.left = Math.random() * 100 + 'vw'; p.style.background = col[i % col.length]; p.style.animationDuration = 2.5 + Math.random() * 2.5 + 's'; p.style.animationDelay = Math.random() * .8 + 's'; p.style.transform = `rotate(${Math.random() * 360}deg)`; c.append(p); }
+    setTimeout(() => { c.innerHTML = ''; }, 6000);
+  }
+  let n = 0;
+  (async function revisar() {
+    try {
+      const r = await fetch(`${K.API}/registro/estado/${encodeURIComponent(id)}`).then(x => x.json());
+      const d = r.data || {};
+      if (d.estado === 'listo') {
+        t.innerHTML = `<div class="bv-ic ok"><i class="fa-solid fa-check"></i></div><h1>¡${esc(d.negocio)} ya está en Katú POS!</h1><p>Te enviamos un correo a <b>${esc(d.correo)}</b> para que crees tu contraseña.</p>
+          <div class="bv-pasos"><div><i class="fa-solid fa-envelope-open-text"></i>Abre el correo y toca "Crear mi contraseña" (revisa también spam).</div><div><i class="fa-solid fa-box"></i>Carga tus productos o impórtalos desde Excel.</div><div><i class="fa-solid fa-cash-register"></i>Abre tu caja y haz tu primera venta.</div></div>
+          <a class="btn btn-brillo btn-xl" href="${esc(d.url)}">Ir a mi panel <i class="fa-solid fa-arrow-right"></i></a>${marca}`;
+        sessionStorage.removeItem('katu_registro'); confeti(); return;
+      }
+      if (d.estado === 'error') { t.innerHTML = `<div class="bv-ic"><i class="fa-solid fa-headset"></i></div><h1>Tu pago está registrado</h1><p>Hubo un detalle al crear tu cuenta y nuestro equipo ya fue avisado. Te escribiremos a <b>${esc(d.correo)}</b> muy pronto. También puedes escribirnos a ${esc(K.CONTACTO || 'hola@katupos.com')}.</p>${marca}`; return; }
+    } catch { /* se reintenta */ }
+    if (++n > 90) { t.innerHTML = `<div class="bv-ic"><i class="fa-solid fa-envelope"></i></div><h1>Casi listo</h1><p>Está tardando más de lo normal. Cuando tu negocio esté listo te llegará un correo con el enlace para entrar.</p>${marca}`; return; }
+    setTimeout(revisar, 2000);
+  })();
+})();
+</script>
+</body>
+</html>

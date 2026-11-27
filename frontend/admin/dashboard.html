@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Katú POS</title>
+  <link rel="icon" href="../assets/img/favicon.ico">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Sora:wght@500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+  <link rel="stylesheet" href="pos-admin.css">
+</head>
+<body data-pagina="dashboard">
+<main class="content"></main>
+<script src="../assets/js/motor.js"></script>
+<script src="pos-admin.js"></script>
+<script>
+(async function () {
+  if (!(await POS.listo)) return;
+
+  async function cargar() {
+    const d = await datos('/reportes/dashboard'); if (!d) return;
+    const h = d.hoy, c = d.comparacion;
+    document.querySelector('main').innerHTML = `<div class="head"><div><h1>Hola, ${esc(POS.user.nombre.split(' ')[0])}</h1><p>${fecha(new Date(), { dateStyle: 'full' })}</p></div><div class="acts"><button class="btn" id="act"><i class="fa-solid fa-rotate"></i> Actualizar</button></div></div>
+    ${d.alertas.documentos ? `<a class="aviso m" href="ventas.html?documento=error" style="text-decoration:none"><i class="fa-solid fa-file-circle-exclamation"></i><span>${d.alertas.documentos} ventas con error en su documento electrónico. El sistema las reintenta; revisa el motivo.</span></a>` : ''}
+    <div class="kpis">
+      <div class="kpi"><div class="k"><i class="fa-solid fa-sack-dollar"></i>Ventas de hoy</div><div class="v">${dinero(h.total)}</div><div class="s">${c == null ? 'Sin ventas hace 7 días a esta hora' : `<span class="${c >= 0 ? 'sube' : 'baja'}">${c >= 0 ? '▲' : '▼'} ${Math.abs(c)}%</span> frente a hace 7 días a esta hora`}</div></div>
+      <div class="kpi"><div class="k"><i class="fa-solid fa-receipt"></i>Transacciones</div><div class="v">${fnum(h.n)}</div><div class="s">Promedio ${dinero(h.ticket)} por venta</div></div>
+      <div class="kpi"><div class="k"><i class="fa-solid fa-chart-pie"></i>Utilidad estimada</div><div class="v">${dinero(h.utilidad)}</div><div class="s">Margen ${fnum(h.margen, 1)}% antes de impuestos</div></div>
+      <div class="kpi"><div class="k"><i class="fa-solid fa-user-plus"></i>Clientes nuevos</div><div class="v">${fnum(d.clientesNuevos)}</div><div class="s">${h.n ? Math.round(h.conCliente * 100 / h.n) : 0}% de las ventas con cliente</div></div>
+    </div>
+    <div class="dos"><div class="card"><header><h3>Ventas de los últimos 14 días</h3></header><div class="b" id="g1"></div></div><div class="card"><header><h3>Cómo pagaron hoy</h3></header><div class="b" id="g3"></div></div></div>
+    <div class="dos"><div class="card"><header><h3>Ventas de hoy por hora</h3></header><div class="b" id="g2"></div></div><div class="card"><header><h3>Para atender</h3></header><div class="b" style="gap:8px">${[['inventario.html?bajo=1', 'fa-box-open', d.alertas.agotados, 'productos en el mínimo o agotados'], ['vencimientos.html', 'fa-hourglass-half', d.alertas.vencen, 'lotes vencen en 15 días'], ['pedidos.html', 'fa-motorcycle', (d.pedidos.recibido || 0) + (d.pedidos.preparando || 0) + (d.pedidos.listo || 0) + (d.pedidos.en_camino || 0), 'domicilios activos']].map(x => `<a class="ped" style="text-decoration:none;color:inherit" href="${x[0]}"><div class="t"><span><i class="fa-solid ${x[1]}" style="color:var(--primary);width:24px"></i> ${x[3]}</span><b>${fnum(x[2])}</b></div></a>`).join('')}</div></div></div>
+    <div class="mitad"><div class="card"><header><h3>Más vendidos en 7 días</h3></header><div class="b" id="g4"></div></div><div class="card"><header><h3>Últimas ventas</h3></header><div id="g5"></div></div></div>`;
+    const dia = f => new Date(f + 'T12:00:00Z').toLocaleDateString(POS.pais.locale, { timeZone: 'UTC', day: 'numeric', month: 'short' });
+    barras($('g1'), d.serie, { etiqueta: x => dia(x.fecha), valor: x => x.total, tip: x => [dia(x.fecha), dinero(x.total), x.n + ' ventas'], cada: 2 });
+    const hs = d.horas.filter(x => x.hora >= 5 && x.hora <= 23);
+    barras($('g2'), hs, { etiqueta: x => x.hora + 'h', valor: x => x.total, tip: x => [`${x.hora}:00 – ${x.hora}:59`, dinero(x.total), x.n + ' ventas'], cada: 2 });
+    barrasH($('g3'), d.medios, { nombre: x => x._id, valor: x => x.total, texto: x => dinero(x.total) });
+    barrasH($('g4'), d.top, { nombre: x => x.nombre, valor: x => x.total, texto: x => dinero(x.total) });
+    tabla($('g5'), [{ t: 'Venta', f: v => `<b>${esc(v.numero)}</b><small>${fecha(v.fecha, { timeStyle: 'short', dateStyle: 'short' })}</small>` }, { t: 'Pago', f: v => esc(v.pagos.map(p => p.nombre).join(', ')) }, { t: 'Total', n: 1, f: v => dinero(v.total) }], d.recientes);
+    $('act').onclick = cargar;
+  }
+  cargar(); setInterval(cargar, 60000);
+})();
+</script>
+</body>
+</html>
