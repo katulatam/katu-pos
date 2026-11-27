@@ -17,7 +17,7 @@ exports.estado = manejar(async req => {
   const p = facturacion.proveedorDe(req.pais), f = e.facturacion || {}, r = f.resolucion || {};
   const usados = r.hasta ? Math.round((f.siguienteNumero - r.desde) * 100 / (r.hasta - r.desde + 1)) : 0;
   return {
-    paisDisponible: !!p, servidorListo: !!p?.disponible(), sandbox: !!p?.config?.().sandbox, activa: !!f.activa, vinculada: !!f.empresaProveedorId,
+    paisDisponible: !!p, servidorListo: !!p?.disponible(), enPrueba: require('../utils/prueba').enPrueba(e), sandbox: !!p?.config?.().sandbox, activa: !!f.activa, vinculada: !!f.empresaProveedorId,
     idFiscal: f.idFiscal, razonSocial: f.razonSocial, estadoHabilitacion: f.estadoHabilitacion, facturarConsumidorFinal: f.facturarConsumidorFinal !== false,
     resolucion: r.numero ? { numero: r.numero, prefijo: r.prefijo, desde: r.desde, hasta: r.hasta, fechaInicio: r.fechaInicio, fechaFin: r.fechaFin, claveConfigurada: !!r.claveTecnica } : null,
     siguienteNumero: f.siguienteNumero, porcentajeUsado: usados, prefijoNotaCredito: f.prefijoNotaCredito, siguienteNotaCredito: f.siguienteNotaCredito,

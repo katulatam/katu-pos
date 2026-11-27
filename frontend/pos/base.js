@@ -29,7 +29,19 @@
     const d = await r.json().catch(() => null);
     if (!d) return { success: false, red: r.status >= 500, error: 'El servidor no respondió correctamente' };
     d.http = r.status;
+    if (d.codigo === 'PRUEBA_VENCIDA') bloqueoPrueba(d.error);
     return d;
+  }
+
+  // Prueba gratis: aviso con los días que quedan y bloqueo cuando termina
+  function bloqueoPrueba(msj) {
+    if ($('bloqueoPrueba')) return;
+    document.body.insertAdjacentHTML('beforeend', `<div id="bloqueoPrueba" class="bloqueo-prueba"><div><i class="fa-solid fa-lock"></i><h2>Tu prueba gratis terminó</h2><p>${esc(msj || 'El administrador puede elegir un plan en el panel → Mi suscripción, y todo vuelve a funcionar al instante.')}</p><p class="nota">Tus productos, clientes y ventas siguen guardados.</p><a class="b1" href="../admin/suscripcion.html">Ir a Mi suscripción</a></div></div>`);
+  }
+  function avisoPrueba(dias) {
+    if (dias === null || dias === undefined || $('avisoPrueba')) return;
+    if (dias <= 0) return bloqueoPrueba();
+    document.body.insertAdjacentHTML('beforeend', `<a id="avisoPrueba" class="aviso-prueba ${dias <= 3 ? 'urge' : ''}" href="../admin/suscripcion.html" target="_blank" rel="noopener"><i class="fa-solid fa-hourglass-half"></i>Prueba gratis: ${dias === 1 ? 'queda 1 día' : `quedan ${dias} días`}</a>`);
   }
 
   // ── IndexedDB: datos de arranque y cola de ventas sin conexión ──
@@ -75,7 +87,7 @@
   const cambiarTema = () => { const n = document.documentElement.dataset.tema === 'claro' ? 'oscuro' : 'claro'; aplicarTema(n); localStorage.setItem('katu_pos_tema', n); };
   const uuid = () => (crypto.randomUUID ? crypto.randomUUID() : 'xxxxxxxx-xxxx-4xxx-8xxx-xxxxxxxxxxxx'.replace(/x/g, () => (Math.random() * 16 | 0).toString(16)));
 
-  Object.assign(window, { API, esc, iniciales, $, sesion, api, bd, toast, ventana, hayVentana, ultimaVentana, confirmar, cambiarTema, uuid });
+  Object.assign(window, { API, esc, iniciales, $, sesion, api, bd, toast, avisoPrueba, ventana, hayVentana, ultimaVentana, confirmar, cambiarTema, uuid });
   if ($('bTema')) { aplicarTema(document.documentElement.dataset.tema); $('bTema').onclick = cambiarTema; }
   if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(() => {});
 })();

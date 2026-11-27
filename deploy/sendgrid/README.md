@@ -6,7 +6,7 @@ Si la variable de una plantilla está vacía, se usa el diseño de respaldo que 
 
 | Correo | Archivo | Variable de entorno | Variables de la plantilla |
 |---|---|---|---|
-| Bienvenida (al pagar la suscripción) | `bienvenida.html` | `SENDGRID_TEMPLATE_BIENVENIDA` | `asunto`, `nombre`, `negocio`, `dominio`, `usuario`, `horas`, `url_activar`, `url_panel`, `url_caja`, `url_tienda`, `anio` |
+| Bienvenida (al pagar o al empezar la prueba gratis) | `bienvenida.html` | `SENDGRID_TEMPLATE_BIENVENIDA` | `asunto`, `nombre`, `negocio`, `dominio`, `usuario`, `horas`, `url_activar`, `url_panel`, `url_caja`, `url_tienda`, `anio`, `prueba` (sí/no), `nota_prueba`, `dias_prueba`, `prueba_hasta` |
 | Recuperar contraseña | `recuperar.html` | `SENDGRID_TEMPLATE_RECUPERAR` | `asunto`, `nombre`, `negocio`, `url_activar`, `horas`, `anio` |
 
 Las campañas de marketing no usan plantilla: cada una lleva el logo, el color y el texto de su comercio.

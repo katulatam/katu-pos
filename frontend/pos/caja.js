@@ -33,6 +33,7 @@
     else if (r.red && (D = await bd.leer('arranque:' + idCaja))) conexion(false);
     else { toast(r.error, 'mal'); return setTimeout(() => location.replace('index.html'), 1800); }
     if (D.caja.tipo === 'autopago') return location.replace('autopago.html');
+    avisoPrueba(D.diasPrueba);
     indexar();
     if (D.turno && sesion.user.rol === 'cajero' && String(D.turno.cajero?._id || D.turno.cajero) !== String(D.usuario._id)) { toast('Esa caja tiene el turno de otro cajero', 'mal'); return setTimeout(() => location.replace('index.html'), 1800); }
     $('cabina').hidden = false;

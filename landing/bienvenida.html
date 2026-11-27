@@ -17,7 +17,7 @@
   <div class="bv-tarjeta" id="t">
     <div class="bv-ic"><div class="girando"></div></div>
     <h1>Estamos creando tu negocio…</h1>
-    <p>Tu pago fue recibido. Esto toma solo unos segundos.</p>
+    <p>Esto toma solo unos segundos.</p>
   </div>
 </main>
 <div class="confeti" id="confeti" aria-hidden="true"></div>
@@ -42,11 +42,11 @@
       const d = r.data || {};
       if (d.estado === 'listo') {
         t.innerHTML = `<div class="bv-ic ok"><i class="fa-solid fa-check"></i></div><h1>¡${esc(d.negocio)} ya está en Katú POS!</h1><p>Te enviamos un correo a <b>${esc(d.correo)}</b> para que crees tu contraseña.</p>
-          <div class="bv-pasos"><div><i class="fa-solid fa-envelope-open-text"></i>Abre el correo y toca "Crear mi contraseña" (revisa también spam).</div><div><i class="fa-solid fa-box"></i>Carga tus productos o impórtalos desde Excel.</div><div><i class="fa-solid fa-cash-register"></i>Abre tu caja y haz tu primera venta.</div></div>
+          <div class="bv-pasos"><div><i class="fa-solid fa-envelope-open-text"></i>Abre el correo y toca "Crear mi contraseña" (revisa también spam).</div><div><i class="fa-solid fa-box"></i>Carga tus productos o impórtalos desde Excel.</div><div><i class="fa-solid fa-cash-register"></i>Abre tu POS y haz tu primera venta.</div></div>${d.prueba ? `<p style="margin-top:-8px"><b>Tu prueba gratis de ${esc(d.diasPrueba)} días ya empezó.</b> Elige tu plan cuando quieras desde "Mi suscripción".</p>` : ''}
           <a class="btn btn-brillo btn-xl" href="${esc(d.url)}">Ir a mi panel <i class="fa-solid fa-arrow-right"></i></a>${marca}`;
         sessionStorage.removeItem('katu_registro'); confeti(); return;
       }
-      if (d.estado === 'error') { t.innerHTML = `<div class="bv-ic"><i class="fa-solid fa-headset"></i></div><h1>Tu pago está registrado</h1><p>Hubo un detalle al crear tu cuenta y nuestro equipo ya fue avisado. Te escribiremos a <b>${esc(d.correo)}</b> muy pronto. También puedes escribirnos a ${esc(K.CONTACTO || 'hola@katupos.com')}.</p>${marca}`; return; }
+      if (d.estado === 'error') { t.innerHTML = `<div class="bv-ic"><i class="fa-solid fa-headset"></i></div><h1>${d.prueba ? 'Recibimos tu registro' : 'Tu pago está registrado'}</h1><p>Hubo un detalle al crear tu cuenta y nuestro equipo ya fue avisado. Te escribiremos a <b>${esc(d.correo)}</b> muy pronto. También puedes escribirnos a ${esc(K.CONTACTO || 'hola@katupos.com')}.</p>${marca}`; return; }
     } catch { /* se reintenta */ }
     if (++n > 90) { t.innerHTML = `<div class="bv-ic"><i class="fa-solid fa-envelope"></i></div><h1>Casi listo</h1><p>Está tardando más de lo normal. Cuando tu negocio esté listo te llegará un correo con el enlace para entrar.</p>${marca}`; return; }
     setTimeout(revisar, 2000);

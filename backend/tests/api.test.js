@@ -653,6 +653,48 @@ test('suscripción: landing → Stripe → alta automática, subdominio, mora, s
     await evento('customer.subscription.deleted', { id: 'sub_1' });
     assert.deepEqual(await M('Empresa').findById(emp._id).lean().then(x => [x.estado, x.suscripcion.estado]), [false, 'cancelada']);
 
+    // Prueba gratis sin tarjeta: Premium 15 días → avisos → bloqueo → pago → activa
+    const info = ok(await api('', 'GET', '/registro/planes')).prueba;
+    assert.deepEqual([info.dias, info.plan], [15, 'premium']);
+    const dp = { negocio: 'Tienda Prueba', nombre: 'Luis Prieto', correo: 'luis@prueba.co', telefono: '300 111 2233', pais: 'CO', subdominio: 'tienda-prueba' };
+    no(await api('', 'POST', '/registro/prueba', { ...dp, telefono: '' }), 400);
+    const pr = ok(await api('', 'POST', '/registro/prueba', dp));
+    const ep = ok(await api('', 'GET', '/registro/estado/' + pr.registro));
+    assert.deepEqual([ep.estado, ep.prueba, ep.diasPrueba], ['listo', true, 15]);
+    assert.equal(no(await api('', 'POST', '/registro/prueba', { ...dp, correo: 'otro@prueba.co', subdominio: 'otra-prueba', telefono: '(300) 111-2233' }), 409).codigo, 'PRUEBA_USADA');
+    let tp = await M('Empresa').findOne({ slug: 'tienda-prueba' }).lean();
+    assert.deepEqual([tp.suscripcion.estado, tp.suscripcion.plan, tp.modulos.kiosco, tp.modulos.marketing, tp.modulos.facturacion], ['prueba', 'premium', true, true, true]);
+    assert.ok(Math.abs(new Date(tp.suscripcion.pruebaHasta) - Date.now() - 15 * 86400000) < 60000);
+    const fact = require('../utils/facturacion'), paisCo = await require('../utils/contexto').paisPorCodigo('CO');
+    assert.equal(fact.activa({ ...tp, facturacion: { activa: true, empresaProveedorId: 'x' } }, paisCo), false, 'sin facturas reales en la prueba');
+    const luis = await M('Usuario').findOne({ correo: 'luis@prueba.co' }).lean();
+    ok(await api('', 'POST', '/auth/crear-clave', { token: await require('../utils/empresas').enlaceClave(luis._id), password: 'ClaveLuis123' }));
+    tk.luis = ok(await api('', 'POST', '/auth/login', { correo: 'luis@prueba.co', password: 'ClaveLuis123' }, { 'X-Forwarded-Host': 'tienda-prueba.katupos.test' })).token;
+    const sp = ok(await api('luis', 'GET', '/cuenta/suscripcion'));
+    assert.deepEqual([sp.enPrueba, sp.diasRestantes, sp.vencida, sp.planes.length], [true, 15, false, 3]);
+    assert.equal(await sus.revisarPruebas(), 0);
+    // Faltan 4 días → aviso de 5 días (una sola vez)
+    await M('Empresa').updateOne({ _id: tp._id }, { 'suscripcion.pruebaHasta': new Date(Date.now() + 4 * 86400000) });
+    assert.equal(await sus.revisarPruebas(), 1); assert.equal(await sus.revisarPruebas(), 0);
+    // Vence: aviso final y la cuenta queda en pausa (menos el panel para suscribirse); la tienda se oculta
+    await M('Empresa').updateOne({ _id: tp._id }, { 'suscripcion.pruebaHasta': new Date(Date.now() - 1000) });
+    assert.equal(await sus.revisarPruebas(), 1);
+    tp = await M('Empresa').findById(tp._id).lean();
+    assert.deepEqual([tp.suscripcion.estado, tp.suscripcion.avisosPrueba], ['vencida', ['d5', 'fin']]);
+    assert.equal(no(await api('luis', 'GET', '/productos'), 402).codigo, 'PRUEBA_VENCIDA');
+    ok(await api('luis', 'GET', '/configuracion'));
+    assert.equal(ok(await api('luis', 'GET', '/cuenta/suscripcion')).vencida, true);
+    no(await api('', 'GET', '/tienda/t/tienda-prueba/catalogo'), 404);
+    // Elige plan → Stripe (sin prueba de Stripe) → webhook → activa con los módulos del plan elegido
+    assert.equal(ok(await api('luis', 'POST', '/cuenta/suscripcion/checkout', { plan: 'basico', periodo: 'mensual' })).url, 'https://checkout.stripe.test/cs_test_1');
+    const pc = recibidosStripe.filter(r => r.u === '/checkout/sessions').pop().body;
+    assert.deepEqual([pc.get('metadata[empresa]'), pc.get('metadata[plan]'), pc.get('subscription_data[trial_period_days]')], [String(tp._id), 'basico', null]);
+    assert.equal((await evento('checkout.session.completed', { mode: 'subscription', customer: 'cus_2', subscription: 'sub_2', metadata: { empresa: String(tp._id), plan: 'basico', periodo: 'mensual' } })).status, 200);
+    tp = await M('Empresa').findById(tp._id).lean();
+    assert.deepEqual([tp.suscripcion.estado, tp.suscripcion.plan, tp.suscripcion.stripeSuscripcion, tp.suscripcion.pruebaHasta, tp.modulos.kiosco, tp.modulos.facturacion], ['activa', 'basico', 'sub_2', undefined, false, true]);
+    ok(await api('luis', 'GET', '/productos'));
+    no(await api('luis', 'POST', '/cuenta/suscripcion/checkout', { plan: 'pro' }), 409);
+
     // Bloqueos: con dos contenedores, una tarea corre una sola vez
     const { conBloqueo } = require('../utils/bloqueo');
     let corridas = 0;

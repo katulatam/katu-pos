@@ -35,6 +35,8 @@
       if (r.status === 401) { salir(); return { success: false, error: 'Sesión vencida' }; }
       const d = await r.json();
       if (d.codigo === 'EMPRESA_INACTIVA') salir('?off=1');
+      // Prueba gratis vencida: solo queda "Mi suscripción" para elegir un plan
+      if (d.codigo === 'PRUEBA_VENCIDA' && pag !== 'suscripcion') { if (USER.rol === 'admin') location.replace('suscripcion.html'); else salir('?prueba=1'); }
       return d;
     } catch { return { success: false, error: 'No hay conexión con el servidor' }; }
   }
@@ -190,11 +192,23 @@
     const tit = MENU.flatMap(x => x[1]).find(x => x[0] === pag); document.title = `${tit ? tit[1] : 'Panel'} — Katú POS`;
     return tit ? puede(tit[3], tit[4]) : true;
   }
+  // Barra de la prueba gratis: días que quedan (ámbar los últimos 3) y botón para elegir plan
+  function avisoPrueba() {
+    const s = POS.empresa?.suscripcion;
+    if (!s?.pruebaHasta || s.stripeSuscripcion || !['prueba', 'vencida'].includes(s.estado)) return;
+    const dias = Math.max(0, Math.ceil((new Date(s.pruebaHasta) - Date.now()) / 86400000));
+    const b = document.createElement('div');
+    b.className = 'barra-prueba' + (dias <= 3 ? ' urge' : '');
+    const admin = USER.rol === 'admin' || ES_SUPER;
+    b.innerHTML = `<i class="fa-solid ${dias ? 'fa-hourglass-half' : 'fa-lock'}"></i><span>${dias ? `Te ${dias === 1 ? 'queda <b>1 día</b>' : `quedan <b>${dias} días</b>`} de prueba gratis con todo el plan.` : '<b>Tu prueba gratis terminó.</b> Tus datos están guardados: elige un plan para seguir vendiendo.'}</span>${admin && pag !== 'suscripcion' ? '<a class="btn sm p" href="suscripcion.html">Elegir mi plan</a>' : ''}`;
+    main.before(b);
+  }
   POS.listo = (async () => {
     const [c, e] = await Promise.all([api('/configuracion'), ES_SUPER ? api('/empresas') : { data: [] }]);
     if (c.success) { POS.empresa = c.data.empresa; POS.pais = c.data.pais; POS.medios = c.data.medios || []; POS.modoDemo = c.data.modoDemo; }
     if (!POS.empresa && !SIN_EMPRESA.includes(pag)) { if (ES_SUPER) location.replace('empresas.html'); return false; }
     const ok = layout(e.data || []);
+    avisoPrueba();
     main.hidden = false;
     if (!ok) { main.innerHTML = '<div class="card"><div class="nada"><i class="fa-solid fa-lock"></i>No tienes acceso a esta opción.</div></div>'; return false; }
     return true;

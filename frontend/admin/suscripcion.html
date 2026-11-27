@@ -17,11 +17,48 @@
 (async function () {
   if (!(await POS.listo)) return;
   const main = document.querySelector('main');
+  // Vuelta desde Stripe: se confirma el pago sin esperar al webhook
+  const sesion = new URLSearchParams(location.search).get('sesion');
+  if (sesion) {
+    main.innerHTML = '<div class="card"><div class="nada"><i class="fa-solid fa-spinner fa-spin"></i>Confirmando tu pago…</div></div>';
+    let ok = false;
+    for (let i = 0; i < 8 && !ok; i++) { const r = await api('/cuenta/suscripcion/confirmar', 'POST', { sesion }); ok = !!r.data?.activa; if (!ok) await new Promise(x => setTimeout(x, 2000)); }
+    history.replaceState(null, '', location.pathname);
+    if (ok) { toast('¡Listo! Tu suscripción está activa'); setTimeout(() => location.replace('dashboard.html'), 1200); return; }
+    toast('Tu pago se está procesando; en unos minutos se activa tu cuenta', 'mal');
+  }
   const s = await datos('/cuenta/suscripcion'); if (!s) return;
   const MOD = { facturacion: 'Facturación electrónica', fiado: 'Fiado', domicilios: 'Domicilios y tienda en línea', gamificacion: 'Gamificación', whatsapp: 'WhatsApp con IA', kiosco: 'Autopago', marketing: 'Marketing' };
-  const EST = { activa: ['Activa', 'ok'], prueba: ['En prueba', 'az'], mora: ['Pago pendiente', 'av'], cancelada: ['Cancelada', 'mal'] };
-  const plata = (n, m) => `${m === 'USD' ? 'US$' : '$'} ${Number(n || 0).toLocaleString('es-CO')}`;
-  const [et, cl] = EST[s.estado] || EST.activa;
+  const EST = { activa: ['Activa', 'ok'], prueba: ['En prueba', 'az'], mora: ['Pago pendiente', 'av'], cancelada: ['Cancelada', 'mal'], vencida: ['Prueba terminada', 'mal'] };
+  const plata = (n, m) => `${m === 'USD' ? 'US$' : '$'} ${Number(n || 0).toLocaleString(m === 'COP' ? 'es-CO' : 'en-US', { maximumFractionDigits: Number.isInteger(Number(n)) ? 0 : 2 })}`;
+  const [et, cl] = EST[s.vencida ? 'vencida' : s.estado] || EST.activa;
+  // Prueba gratis (o suscripción cancelada): elegir plan y pagar en Stripe
+  if (s.planes) {
+    let periodo = 'mensual';
+    const pintar = () => {
+      $('pl').innerHTML = s.planes.map(p => `<div class="card plan-op ${p.destacado ? 'dest' : ''}"><div class="b">
+        <div style="display:flex;justify-content:space-between;align-items:center"><b style="font-family:var(--titulo);font-size:20px">${esc(p.nombre)}</b>${p.destacado ? '<span class="bd vi">Recomendado</span>' : ''}</div>
+        <p style="color:var(--muted);margin:0">${esc(p.descripcion || '')}</p>
+        <div><b style="font-size:26px;font-family:var(--titulo)">${plata(periodo === 'anual' ? p.precioAnual : p.precioMensual, p.moneda)}</b> <span style="color:var(--muted)">/ ${periodo === 'anual' ? 'año' : 'mes'}</span></div>
+        <ul style="margin:0;padding-left:18px;color:var(--muted);font-size:13px;display:flex;flex-direction:column;gap:4px">${(p.caracteristicas || []).map(c => `<li>${esc(c)}</li>`).join('')}</ul>
+        <button class="btn ${p.destacado ? 'p' : ''}" data-plan="${esc(p.codigo)}" style="margin-top:auto"><i class="fa-solid fa-lock"></i> Elegir ${esc(p.nombre)}</button></div></div>`).join('');
+    };
+    const titulo = s.vencida ? 'Tu prueba gratis terminó' : s.enPrueba ? `Te ${s.diasRestantes === 1 ? 'queda 1 día' : `quedan ${s.diasRestantes} días`} de prueba` : 'Reactiva tu suscripción';
+    main.innerHTML = `<div class="head"><div><h1>Mi suscripción</h1><p>Elige tu plan y paga de forma segura con tarjeta. Cancelas cuando quieras.</p></div></div>
+      <div class="aviso ${s.vencida ? 'm' : s.diasRestantes <= 3 ? 'a' : 'i'}"><i class="fa-solid ${s.vencida ? 'fa-lock' : 'fa-hourglass-half'}"></i><div><b>${titulo}.</b> ${s.vencida ? 'Tu caja y tu tienda en línea están en pausa, pero no perdiste nada: tus productos, clientes y ventas siguen guardados. Al pagar, todo vuelve a funcionar al instante.' : s.enPrueba ? `Estás probando todo el plan ${esc(s.plan?.nombre || '')} hasta el ${fecha(s.pruebaHasta)}. Elige tu plan cuando quieras: lo que ya cargaste se queda tal cual.` : 'Elige un plan para volver a vender.'}</div></div>
+      <div style="display:flex;justify-content:center"><div class="chips" id="per"><button class="chip on" data-p="mensual">Mensual</button><button class="chip" data-p="anual">Anual · 2 meses gratis</button></div></div>
+      <div class="planes-op" id="pl"></div>
+      ${s.modoPrueba ? '<p style="text-align:center;color:var(--warning);font-size:13px">Pagos en modo de prueba: usa la tarjeta 4242 4242 4242 4242.</p>' : ''}`;
+    pintar();
+    $('per').onclick = e => { const b = e.target.closest('[data-p]'); if (!b) return; periodo = b.dataset.p; $('per').querySelectorAll('.chip').forEach(x => x.classList.toggle('on', x === b)); pintar(); };
+    $('pl').onclick = async e => {
+      const b = e.target.closest('[data-plan]'); if (!b) return;
+      b.disabled = true; b.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Preparando el pago…';
+      const r = await datos('/cuenta/suscripcion/checkout', 'POST', { plan: b.dataset.plan, periodo });
+      if (r?.url) location.href = r.url; else pintar();
+    };
+    return;
+  }
   main.innerHTML = `<div class="head"><div><h1>Mi suscripción</h1><p>Tu plan de Katú POS y tus pagos.</p></div></div>
     ${s.estado === 'mora' ? `<div class="aviso m"><i class="fa-solid fa-triangle-exclamation"></i> No pudimos cobrar tu suscripción${s.moraDesde ? ` desde el ${fecha(s.moraDesde)}` : ''}. Actualiza tu tarjeta para evitar la suspensión (tienes ${s.diasGracia} días de gracia).</div>` : ''}
     <div class="grid" style="align-items:start">

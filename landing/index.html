@@ -3,11 +3,11 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Katú POS — La caja que vende en tienda, a domicilio y por WhatsApp</title>
-  <meta name="description" content="Punto de venta para minimercados y tiendas: caja rápida con báscula, inventario, factura electrónica (según tu país), domicilios, WhatsApp con inteligencia artificial, autopago y marketing. Tu negocio listo en minutos en tu propio subdominio.">
+  <title>Katú POS — El POS que vende en tu tienda, a domicilio y por WhatsApp</title>
+  <meta name="description" content="Punto de venta (POS) para minimercados y tiendas: POS rápido con báscula, inventario, factura electrónica (según tu país), domicilios, WhatsApp con inteligencia artificial, autopago y marketing. Pruébalo gratis 15 días, sin tarjeta.">
   <meta name="theme-color" content="#F4F7FB">
-  <meta property="og:title" content="Katú POS — Vende más, desde una sola caja">
-  <meta property="og:description" content="Caja, factura electrónica, domicilios, WhatsApp con IA y autopago. Listo en minutos.">
+  <meta property="og:title" content="Katú POS — Vende más, desde un solo POS">
+  <meta property="og:description" content="POS, inventario, factura electrónica, domicilios, WhatsApp con IA y autopago. Pruébalo gratis 15 días.">
   <meta property="og:type" content="website">
   <link rel="icon" href="img/favicon.ico">
   <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -24,7 +24,7 @@
       <a href="#funciones">Funciones</a><a href="#whatsapp">WhatsApp con IA</a><a href="#autopago">Autopago</a><a href="#planes">Planes</a><a href="#preguntas">Preguntas</a>
     </nav>
     <div class="nav-acc">
-      <a href="#planes" class="btn btn-brillo">Empieza ahora</a>
+      <button type="button" class="btn btn-brillo" data-prueba>Prueba gratis</button>
       <button class="hamb" id="hamb" aria-label="Abrir menú" aria-expanded="false"><i class="fa-solid fa-bars"></i></button>
     </div>
   </div>
@@ -38,20 +38,21 @@
     <div class="contenedor hero-in">
       <div class="hero-txt">
         <span class="pildora"><span class="punto"></span> Nuevo: asistente de WhatsApp con IA que toma pedidos solo</span>
-        <h1><span class="h1-l">La caja que vende</span><span class="h1-l rot"><span class="degradado" id="rotador">en tu tienda</span></span><span class="h1-l">y nunca se detiene.</span></h1>
-        <p class="hero-sub">Katú POS une la caja, la báscula, la factura electrónica, el inventario, los domicilios y WhatsApp en un solo sistema. Te suscribes hoy y en minutos tu negocio está en <b>tunegocio.katupos.com</b>.</p>
+        <h1><span class="h1-l">El POS que vende</span><span class="h1-l rot"><span class="degradado" id="rotador">en tu tienda</span></span><span class="h1-l">y nunca se detiene.</span></h1>
+        <p class="hero-sub">Katú POS une el punto de venta, la báscula, el inventario, la factura electrónica, los domicilios y WhatsApp en un solo sistema. Pruébalo gratis <span class="dias-prueba">15</span> días y en minutos tu negocio está en <b>tunegocio.katupos.com</b>.</p>
         <div class="hero-cta">
-          <a href="#planes" class="btn btn-brillo btn-xl">Ver planes <i class="fa-solid fa-arrow-right"></i></a>
-          <a href="#funciones" class="btn btn-vidrio btn-xl"><i class="fa-solid fa-play"></i> Cómo funciona</a>
+          <button type="button" class="btn btn-brillo btn-xl" data-prueba><span>Prueba <span class="dias-prueba">15</span> días gratis</span> <i class="fa-solid fa-arrow-right"></i></button>
+          <a href="#planes" class="btn btn-vidrio btn-xl">Ver planes</a>
         </div>
         <ul class="hero-confianza">
           <li><i class="fa-solid fa-earth-americas"></i> Tu moneda, impuestos y horario</li>
           <li><i class="fa-solid fa-wifi"></i> Vende aunque se caiga internet</li>
-          <li><i class="fa-solid fa-lock"></i> Pago seguro con Stripe</li>
+          <li data-prueba-txt><i class="fa-solid fa-credit-card"></i> Sin tarjeta para probar</li>
+          <li><i class="fa-solid fa-award"></i> +10 años de experiencia Katú</li>
         </ul>
       </div>
 
-      <!-- Maqueta viva de la caja -->
+      <!-- Maqueta viva del POS -->
       <div class="hero-visual" aria-hidden="true">
         <div class="pantalla" id="pantalla">
           <div class="pt-barra"><span class="pt-marca"><i class="fa-solid fa-bolt"></i></span><b>Minimarket Órbita</b><span class="pt-sep"></span><span class="pt-ok"><i></i> En línea</span></div>
@@ -84,6 +85,22 @@
     <span><i class="fa-solid fa-barcode"></i> Lector de códigos</span><span><i class="fa-solid fa-weight-scale"></i> Báscula integrada</span><span><i class="fa-solid fa-file-invoice"></i> Factura electrónica</span><span><i class="fa-solid fa-motorcycle"></i> Domicilios</span><span><i class="fa-brands fa-whatsapp"></i> WhatsApp con IA</span><span><i class="fa-solid fa-cash-register"></i> Autopago</span><span><i class="fa-solid fa-qrcode"></i> Pagos QR</span><span><i class="fa-solid fa-bullhorn"></i> Campañas</span><span><i class="fa-solid fa-trophy"></i> Puntos y niveles</span><span><i class="fa-solid fa-store"></i> Multisede</span>
   </div></div>
 
+  <!-- ── Confianza ── -->
+  <section class="respaldo" id="nosotros">
+    <div class="contenedor respaldo-in">
+      <div class="revelar">
+        <span class="etiqueta">Quiénes somos</span>
+        <h2>Más de 10 años de experiencia detrás de cada venta.</h2>
+        <p>Katú POS nace de <b>Katú</b>, el proyecto con el que llevamos más de una década en las cafeterías de colegios de Latinoamérica. Allí aprendimos a atender rápido, cuadrar cada peso y no detenernos nunca. Esa experiencia es la que hoy ponemos en tu negocio.</p>
+      </div>
+      <div class="sellos revelar">
+        <div class="sello"><b class="sello-num">+10</b><span>años en cafeterías escolares de Latinoamérica</span></div>
+        <div class="sello"><i class="fa-solid fa-trophy"></i><b>Ingenio Colombia</b><span>Ganadores del premio</span></div>
+        <div class="sello"><i class="fa-solid fa-award"></i><b>Excelencia Empresarial</b><span>Ganadores · Universidad Icesi</span></div>
+      </div>
+    </div>
+  </section>
+
   <!-- ── Funciones ── -->
   <section class="seccion claro" id="funciones">
     <div class="contenedor">
@@ -95,12 +112,12 @@
       <div class="bento">
         <article class="caja grande revelar">
           <div class="caja-ic"><i class="fa-solid fa-bolt"></i></div>
-          <h3>Caja ultrarrápida</h3>
+          <h3>POS ultrarrápido</h3>
           <p>Escanea, pesa y cobra en segundos. Atajos de teclado, lector de códigos, etiquetas de báscula con peso o precio, promociones automáticas y varios medios de pago en una misma venta.</p>
           <div class="mini-caja" aria-hidden="true"><span><kbd>F2</kbd> Buscar</span><span><kbd>F4</kbd> Cliente</span><span><kbd>F9</kbd> Báscula</span><span><kbd>F12</kbd> Cobrar</span></div>
         </article>
         <article class="caja revelar"><div class="caja-ic v"><i class="fa-solid fa-file-invoice"></i></div><h3>Factura electrónica</h3><p>Donde está disponible, se emite sola en cada venta, con reintentos que nunca duplican y notas crédito en las devoluciones.</p><p class="paises-fe" id="paisesFe" hidden></p></article>
-        <article class="caja revelar"><div class="caja-ic n"><i class="fa-solid fa-wifi"></i></div><h3>Funciona sin internet</h3><p>Si se cae la conexión, la caja sigue vendiendo y sincroniza todo cuando vuelve.</p></article>
+        <article class="caja revelar"><div class="caja-ic n"><i class="fa-solid fa-wifi"></i></div><h3>Funciona sin internet</h3><p>Si se cae la conexión, el POS sigue vendiendo y sincroniza todo cuando vuelve.</p></article>
         <article class="caja revelar"><div class="caja-ic a"><i class="fa-solid fa-boxes-stacked"></i></div><h3>Inventario que se cuida solo</h3><p>Existencias por sede, compras a proveedores, lotes y vencimientos, y sugerencias de reabastecimiento.</p></article>
         <article class="caja revelar"><div class="caja-ic r"><i class="fa-solid fa-handshake"></i></div><h3>Fiado sin cuaderno</h3><p>Cupo por cliente, abonos y cartera al día. Nadie fía más de lo que debe.</p></article>
         <article class="caja ancha revelar">
@@ -178,6 +195,8 @@
           <div><b>QR · tarjeta</b><span>solo pagos confirmados por el equipo</span></div>
           <div><b>PIN</b><span>del supervisor para quitar productos</span></div>
         </div>
+        <div class="nota-equipo"><i class="fa-solid fa-circle-info"></i><p><b>Los kioscos de autopago son equipos que se adquieren por aparte.</b> El plan Premium incluye el software de autopago; el equipo (pantalla, lector de códigos y, si lo necesitas, báscula o datáfono) se cotiza según tu tienda.</p></div>
+        <a class="btn btn-borde" href="#" data-cotizar><i class="fa-solid fa-file-invoice-dollar"></i> Solicitar cotización del kiosco</a>
       </div>
       <div class="kiosco revelar" aria-hidden="true">
         <div class="kio-pant">
@@ -211,12 +230,12 @@
     <div class="contenedor">
       <div class="titular revelar centro">
         <span class="etiqueta">Listo en minutos</span>
-        <h2>De la suscripción a tu primera venta, sin llamadas ni esperas.</h2>
+        <h2>De la prueba gratis a tu primera venta, sin llamadas ni esperas.</h2>
       </div>
       <ol class="pasos">
-        <li class="revelar"><span>1</span><h3>Elige tu plan</h3><p>Y el nombre de tu subdominio: <b>tunegocio</b>.katupos.com</p></li>
-        <li class="revelar"><span>2</span><h3>Paga seguro</h3><p>Con tarjeta en la página de Stripe. Cancelas cuando quieras.</p></li>
-        <li class="revelar"><span>3</span><h3>Entra y vende</h3><p>Tu negocio se crea al instante: te llega un correo para crear tu contraseña.</p></li>
+        <li class="revelar"><span>1</span><h3>Crea tu cuenta gratis</h3><p>Sin tarjeta. Elige tu dirección: <b>tunegocio</b>.katupos.com y te llega un correo para crear tu contraseña.</p></li>
+        <li class="revelar"><span>2</span><h3>Prueba todo <span class="dias-prueba">15</span> días</h3><p>Con el plan <b>Premium</b> completo: carga tus productos y vende de verdad.</p></li>
+        <li class="revelar"><span>3</span><h3>Elige tu plan</h3><p>Pagas seguro con tarjeta en Stripe y sigues sin perder nada. Cancelas cuando quieras.</p></li>
       </ol>
     </div>
   </section>
@@ -233,6 +252,7 @@
         </div>
       </div>
       <div class="planes" id="planesLista"></div>
+      <p class="nota-planes" data-prueba-txt><i class="fa-solid fa-gift"></i> La prueba gratis de <span class="dias-prueba">15</span> días incluye todo el plan Premium. Al terminar eliges el plan que prefieras.</p>
       <p class="nota-planes"><span id="notaMoneda">Precios en dólares estadounidenses (USD).</span> Sin cláusula de permanencia. <span id="modoPrueba"></span></p>
     </div>
   </section>
@@ -242,8 +262,10 @@
     <div class="contenedor angosto">
       <div class="titular revelar centro"><span class="etiqueta">Preguntas frecuentes</span><h2>Lo que nos suelen preguntar</h2></div>
       <div class="faq">
+        <details class="revelar" data-prueba-txt><summary>¿Cómo funciona la prueba gratis?</summary><p>Te registras sin tarjeta y durante <span class="dias-prueba">15</span> días usas todo el plan Premium. Te avisamos por correo antes de que termine. Si no eliges un plan, tu cuenta queda en pausa y tus datos se guardan: al suscribirte todo vuelve a funcionar al instante. Durante la prueba no se emiten facturas electrónicas reales.</p></details>
+        <details class="revelar"><summary>¿El kiosco de autopago está incluido?</summary><p>El plan Premium incluye el software de autopago. Los kioscos son equipos que se adquieren por aparte: <a href="#" data-cotizar>solicita tu cotización</a> y te recomendamos el equipo según tu tienda.</p></details>
         <details class="revelar"><summary>¿Necesito instalar algo?</summary><p>No. Katú POS funciona en el navegador de cualquier computador, tablet o celular. Solo si conectas una báscula o una impresora térmica por cable instalas un pequeño agente local, y te guiamos paso a paso.</p></details>
-        <details class="revelar"><summary>¿Qué pasa si se cae el internet?</summary><p>La caja sigue vendiendo en efectivo y datáfono. Las ventas se guardan en el equipo y se sincronizan, con su factura, en cuanto vuelve la conexión.</p></details>
+        <details class="revelar"><summary>¿Qué pasa si se cae el internet?</summary><p>El POS sigue vendiendo en efectivo y datáfono. Las ventas se guardan en el equipo y se sincronizan, con su factura, en cuanto vuelve la conexión.</p></details>
         <details class="revelar"><summary>¿En qué países funciona?</summary><p>Katú POS se adapta a la moneda, los impuestos, los documentos de identidad y la zona horaria de cada país. <span id="faqPaises">Al registrarte eliges el tuyo.</span></p></details>
         <details class="revelar"><summary>¿Incluye factura electrónica?</summary><p>Depende de tu país, porque cada uno tiene sus propias reglas. <span id="faqFe">Donde la ofrecemos, se emite sola en cada venta y te acompañamos en la habilitación ante la autoridad fiscal.</span> Donde aún no está disponible, Katú POS funciona igual con tiquetes de venta, y la activamos en cuanto llegue a tu país.</p></details>
         <details class="revelar"><summary>¿Cómo funciona el WhatsApp con IA?</summary><p>Tu negocio tiene su propio número de WhatsApp Business. El asistente atiende, arma el pedido con tu catálogo real y lo confirma; tus asesores pueden tomar cualquier conversación en cualquier momento. El número requiere la aprobación de Meta, que gestionamos contigo.</p></details>
@@ -258,8 +280,8 @@
     <div class="aurora" aria-hidden="true"><span></span><span></span><span></span></div>
     <div class="contenedor cierre-in revelar">
       <h2>Tu negocio, listo para vender hoy.</h2>
-      <p>Elige tu plan y en minutos estás cobrando en tu propio subdominio.</p>
-      <a href="#planes" class="btn btn-brillo btn-xl">Empezar ahora <i class="fa-solid fa-arrow-right"></i></a>
+      <p>Pruébalo <span class="dias-prueba">15</span> días gratis, sin tarjeta. En minutos estás vendiendo en tu propio subdominio.</p>
+      <button type="button" class="btn btn-brillo btn-xl" data-prueba>Empezar mi prueba gratis <i class="fa-solid fa-arrow-right"></i></button>
     </div>
   </section>
 </main>
@@ -267,7 +289,7 @@
 <footer class="pie">
   <div class="contenedor pie-in">
     <a href="#" class="marca"><span class="marca-ic"><i class="fa-solid fa-bolt"></i></span>Katú <b>POS</b></a>
-    <nav><a href="#funciones">Funciones</a><a href="#planes">Planes</a><a href="#preguntas">Preguntas</a><a id="contacto" href="#">Contacto</a></nav>
+    <nav><a href="#nosotros">Quiénes somos</a><a href="#funciones">Funciones</a><a href="#planes">Planes</a><a href="#preguntas">Preguntas</a><a id="contacto" href="#">Contacto</a></nav>
     <small>© <span id="anio"></span> Katú. Hecho para vender en cualquier parte.</small>
   </div>
 </footer>
@@ -278,15 +300,15 @@
 <div class="velo" id="registro" hidden>
   <form class="modal" id="fRegistro" novalidate>
     <button type="button" class="cerrar" data-cerrar aria-label="Cerrar"><i class="fa-solid fa-xmark"></i></button>
-    <div class="modal-cab"><span class="etiqueta" id="rPlan">Plan</span><h3>Crea tu cuenta</h3><p>En el siguiente paso pagas de forma segura con Stripe.</p></div>
+    <div class="modal-cab"><span class="etiqueta" id="rPlan">Plan</span><h3 id="rTitulo">Crea tu cuenta</h3><p id="rBajada">En el siguiente paso pagas de forma segura con Stripe.</p></div>
     <div class="campos">
       <label class="campo ancho"><span>Nombre de tu negocio</span><input id="rNegocio" required maxlength="80" autocomplete="organization" placeholder="Minimarket La Esquina"></label>
       <label class="campo ancho"><span>Tu dirección web</span><div class="sub-campo"><input id="rSub" required maxlength="40" autocomplete="off" spellcheck="false" placeholder="la-esquina"><em>.katupos.com</em></div><small id="rSubEstado"></small></label>
       <label class="campo"><span>Tu nombre</span><input id="rNombre" required maxlength="80" autocomplete="name"></label>
-      <label class="campo"><span>Celular</span><input id="rTel" inputmode="tel" maxlength="20" autocomplete="tel"></label>
+      <label class="campo"><span id="rTelEt">Celular</span><input id="rTel" inputmode="tel" maxlength="20" autocomplete="tel"></label>
       <label class="campo ancho"><span>Correo (será tu usuario)</span><input id="rCorreo" type="email" required maxlength="120" autocomplete="email"></label>
       <label class="campo"><span>País de tu negocio</span><select id="rPais"><option value="CO">Colombia</option><option value="MX">México</option><option value="PE">Perú</option><option value="CL">Chile</option><option value="EC">Ecuador</option><option value="PA">Panamá</option></select></label>
-      <label class="campo"><span>Periodo</span><select id="rPeriodo"><option value="mensual">Mensual</option><option value="anual">Anual (2 meses gratis)</option></select></label>
+      <label class="campo" id="rCampoPeriodo"><span>Periodo</span><select id="rPeriodo"><option value="mensual">Mensual</option><option value="anual">Anual (2 meses gratis)</option></select></label>
     </div>
     <p class="nota-pais" id="rPaisNota" hidden></p>
     <div class="resumen" id="rResumen"></div>

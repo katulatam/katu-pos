@@ -29,6 +29,7 @@
   if (localStorage.getItem('katu_admin_token')) location.replace('dashboard.html');
   const e = document.getElementById('e'), mal = t => { e.textContent = t; e.hidden = false; };
   if (new URLSearchParams(location.search).get('off')) mal('La empresa está inactiva. Comunícate con Katú.');
+  if (new URLSearchParams(location.search).get('prueba')) mal('La prueba gratis de este negocio terminó. El administrador puede elegir un plan en el panel → Mi suscripción.');
   const fo = document.getElementById('fo'), f = document.getElementById('f');
   document.getElementById('olv').onclick = () => { f.hidden = true; fo.hidden = false; co.value = c.value; co.focus(); };
   document.getElementById('vol').onclick = () => { fo.hidden = true; f.hidden = false; };

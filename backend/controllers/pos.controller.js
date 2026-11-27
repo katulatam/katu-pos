@@ -45,6 +45,7 @@ exports.arranque = manejar(async req => {
   return {
     empresa: { _id: em._id, nombre: em.nombre, razonSocial: em.razonSocial, idFiscal: em.idFiscal, direccion: em.direccion, ciudad: em.ciudad, telefono: em.telefono, logoUrl: em.logoUrl, color: em.color, zonaHoraria: em.zonaHoraria, pos: em.pos, modulos: em.modulos, gamificacion: em.gamificacion },
     pais: paisPublico(req.pais), medios: mediosDe(em, req.pais, autopago ? 'kiosco' : 'caja'), sede, caja, turno, equipos, modoDemo: modoDemo(),
+    diasPrueba: require('../utils/prueba').diasRestantes(em), // null si no está en prueba gratis
     usuario: { _id: req.usuario._id, nombre: req.usuario.nombre, rol: req.usuario.rol },
     categorias, promociones, recompensas,
     productos: productos.map(p => ({ ...p, ...impuestoDe(req.pais, p.impuesto), stock: p.manejaInventario ? (ex.get(String(p._id)) ?? 0) : null })),

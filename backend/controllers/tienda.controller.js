@@ -15,12 +15,13 @@ const gamificacion = require('../utils/gamificacion');
 const geo = require('../utils/geo');
 const { paisPublico } = require('./configuracion.controller');
 const { firmarTokenCliente } = require('../middleware/auth');
+const { pruebaVencida } = require('../utils/prueba');
 const { manejar, ErrorApi, paisPorCodigo, paisDe, mediosDe, ahoraDe, impuestoDe } = require('../utils/contexto');
 
 // Middleware: empresa por slug, con el módulo de domicilios activo
 exports.cargarEmpresa = async (req, res, next) => {
   const e = await Empresa.findOne({ slug: String(req.params.slug).toLowerCase(), estado: true, 'modulos.domicilios': true }).lean().catch(() => null);
-  if (!e) return res.status(404).json({ success: false, error: 'La tienda no está disponible' });
+  if (!e || pruebaVencida(e)) return res.status(404).json({ success: false, error: 'La tienda no está disponible' });
   req.empresa = e; req.pais = await paisDe(e);
   next();
 };
@@ -59,9 +60,10 @@ exports.direcciones = manejar(async req => {
 exports.cercanas = manejar(async req => {
   const punto = { lat: req.query.lat, lng: req.query.lng };
   const pais = String(req.query.pais || '').toUpperCase();
-  const empresas = await Empresa.find({ estado: true, 'modulos.domicilios': true, ...(pais && { pais }) }).select('nombre slug logoUrl color pais zonaHoraria domicilios ciudad').limit(300).lean();
+  const empresas = await Empresa.find({ estado: true, 'modulos.domicilios': true, ...(pais && { pais }) }).select('nombre slug logoUrl color pais zonaHoraria domicilios ciudad suscripcion').limit(300).lean();
   const out = [];
   for (const e of empresas) {
+    if (pruebaVencida(e)) continue;
     const p = await paisDe(e);
     const c = geo.puntoValido(punto) ? await pedidos.cotizar(e, p, punto, 0) : { cubre: false };
     out.push({ nombre: e.nombre, slug: e.slug, logoUrl: e.logoUrl, color: e.color, ciudad: e.ciudad, recoger: e.domicilios?.recogerEnTienda !== false, cobertura: c, moneda: p.moneda });

@@ -25,4 +25,6 @@ module.exports = () => {
   }));
   // Cada hora: suscripciones en mora que agotaron el periodo de gracia
   cron.schedule('17 * * * *', tarea('suscripciones', 10 * 60000, () => suscripciones.suspenderVencidas()));
+  // Cada hora: recordatorios de la prueba gratis (5 días, 1 día) y fin de la prueba
+  cron.schedule('23 * * * *', tarea('pruebas', 10 * 60000, () => suscripciones.revisarPruebas()));
 };

@@ -24,6 +24,7 @@
     const resu = await datos('/facturacion/resumen?desde=' + masDias(hoy(), -29) + '&hasta=' + hoy()) || [];
     const dias = r ? Math.round((new Date(r.fechaFin) - new Date(hoy())) / 86400000) : null;
     M.innerHTML = `<div class="head"><div><h1>Facturación electrónica</h1><p>${esc(P.facturacion.nombreDocumento)} ante la ${esc(P.facturacion.entidad)}${d.sandbox ? ' · ambiente de pruebas' : ''}</p></div><div class="acts"><a class="btn" href="ventas.html?documento=error">Ver documentos con error</a></div></div>
+    ${d.enPrueba ? '<div class="aviso i"><i class="fa-solid fa-hourglass-half"></i><span>Estás en tu prueba gratis: puedes dejar todo configurado, pero los documentos electrónicos reales se emiten desde que te suscribes. Las ventas de la prueba no se facturan.</span></div>' : ''}
     ${!d.servidorListo ? '<div class="aviso m"><i class="fa-solid fa-plug-circle-xmark"></i><span>El servidor no tiene credenciales de facturación: no se emitirá ningún documento.</span></div>' : ''}
     ${d.activa && !r ? '<div class="aviso a"><i class="fa-solid fa-triangle-exclamation"></i><span>Falta registrar la resolución de numeración.</span></div>' : ''}
     ${r && dias <= 30 ? `<div class="aviso a"><i class="fa-solid fa-calendar-xmark"></i><span>${dias < 0 ? 'La resolución venció' : `La resolución vence en ${dias} días`}. Solicita una nueva.</span></div>` : ''}${d.porcentajeUsado >= 90 ? `<div class="aviso a"><i class="fa-solid fa-gauge-high"></i><span>Usaste el ${d.porcentajeUsado}% del rango autorizado.</span></div>` : ''}

@@ -43,15 +43,18 @@ async function llamar(metodo, ruta, datos, llave) {
 const SIN_DECIMALES = ['bif', 'clp', 'djf', 'gnf', 'jpy', 'kmf', 'krw', 'mga', 'pyg', 'rwf', 'ugx', 'vnd', 'vuv', 'xaf', 'xof', 'xpf'];
 const centavos = (monto, moneda) => Math.round(Number(monto) * (SIN_DECIMALES.includes(String(moneda).toLowerCase()) ? 1 : 100));
 
-function crearCheckout({ plan, periodo, correo, registroId, exito, cancelar }) {
+// Registro nuevo (registroId) o empresa que ya existe y se suscribe (empresaId, p. ej. al
+// terminar la prueba gratis: a esa no se le vuelve a dar la prueba de Stripe del plan).
+function crearCheckout({ plan, periodo, correo, registroId, empresaId, exito, cancelar }) {
   const moneda = String(plan.moneda || 'COP').toLowerCase();
+  const meta = { ...(registroId && { registro: String(registroId) }), ...(empresaId && { empresa: String(empresaId) }), plan: plan.codigo, periodo };
   return llamar('post', '/checkout/sessions', {
-    mode: 'subscription', customer_email: correo, client_reference_id: String(registroId),
+    mode: 'subscription', customer_email: correo, client_reference_id: String(registroId || `empresa-${empresaId}`),
     success_url: exito, cancel_url: cancelar, locale: 'es', billing_address_collection: 'auto', allow_promotion_codes: 'true',
     line_items: [{ quantity: 1, price_data: { currency: moneda, unit_amount: centavos(periodo === 'anual' ? plan.precioAnual : plan.precioMensual, moneda), recurring: { interval: periodo === 'anual' ? 'year' : 'month' }, product_data: { name: `Katú POS · Plan ${plan.nombre} (${periodo})` } } }],
-    metadata: { registro: String(registroId), plan: plan.codigo, periodo },
-    subscription_data: { metadata: { registro: String(registroId), plan: plan.codigo, periodo }, ...(plan.diasPrueba > 0 && { trial_period_days: plan.diasPrueba }) },
-  }, `checkout-${registroId}`);
+    metadata: meta,
+    subscription_data: { metadata: meta, ...(!empresaId && plan.diasPrueba > 0 && { trial_period_days: plan.diasPrueba }) },
+  }, registroId ? `checkout-${registroId}` : `checkout-empresa-${empresaId}-${crypto.randomUUID()}`);
 }
 const sesion = id => llamar('get', `/checkout/sessions/${encodeURIComponent(id)}`);
 const portal = (cliente, volver) => llamar('post', '/billing_portal/sessions', { customer: cliente, return_url: volver });

@@ -3,6 +3,8 @@ const Plan = require('../models/Plan');
 const Registro = require('../models/Registro');
 const Empresa = require('../models/Empresa');
 const sus = require('../utils/suscripciones');
+const prueba = require('../utils/prueba');
+const stripe = require('../utils/pagos/stripe');
 const { proteger, autorizar, soloSuper, requiereEmpresa } = require('../middleware/auth');
 const { manejar, ErrorApi } = require('../utils/contexto');
 
@@ -12,9 +14,17 @@ r.use(proteger);
 r.get('/suscripcion', requiereEmpresa, autorizar('admin'), manejar(async req => {
   const e = await Empresa.findById(req.empresa._id).lean(), s = e.suscripcion || {};
   const plan = s.plan ? await Plan.findOne({ codigo: s.plan }).lean() : null;
-  return { administradaPorKatu: !s.stripeCliente, estado: s.estado || 'activa', periodo: s.periodo, actualHasta: s.actualHasta, moraDesde: s.moraDesde, diasGracia: sus.DIAS_GRACIA, plan: plan && sus.planPublico(plan), modulos: e.modulos };
+  const enPrueba = prueba.enPrueba(e);
+  return {
+    administradaPorKatu: !s.stripeCliente && !enPrueba, estado: s.estado || 'activa', periodo: s.periodo, actualHasta: s.actualHasta, moraDesde: s.moraDesde, diasGracia: sus.DIAS_GRACIA, plan: plan && sus.planPublico(plan), modulos: e.modulos,
+    // Prueba gratis: días que quedan y los planes para elegir
+    enPrueba, pruebaHasta: s.pruebaHasta, diasRestantes: prueba.diasRestantes(e), vencida: prueba.pruebaVencida(e),
+    ...((enPrueba || s.estado === 'cancelada') && { planes: await sus.planesActivos(), modoPrueba: stripe.modoPrueba() }),
+  };
 }));
 r.post('/suscripcion/portal', requiereEmpresa, autorizar('admin'), manejar(req => sus.portal(req.empresa)));
+r.post('/suscripcion/checkout', requiereEmpresa, autorizar('admin'), manejar(req => sus.checkoutEmpresa(req.empresa, req.body)));
+r.post('/suscripcion/confirmar', requiereEmpresa, autorizar('admin'), manejar(req => sus.confirmarPago(req.empresa, req.body.sesion)));
 
 // Equipo Katú: planes y registros de la landing
 const CAMPOS = ['nombre', 'descripcion', 'moneda', 'precioMensual', 'precioAnual', 'modulos', 'caracteristicas', 'destacado', 'diasPrueba', 'orden', 'activo'];

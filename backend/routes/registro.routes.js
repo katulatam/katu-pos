@@ -5,7 +5,8 @@ const limitar = require('../middleware/limitar');
 const { manejar } = require('../utils/contexto');
 
 // Público: lo usa la landing www.katupos.com
-r.get('/planes', manejar(async () => ({ planes: await sus.planesActivos(), modoPrueba: stripe.modoPrueba() })));
+r.get('/planes', manejar(async () => ({ planes: await sus.planesActivos(), modoPrueba: stripe.modoPrueba(), prueba: await sus.infoPrueba() })));
+r.post('/prueba', limitar({ max: 5, ventanaMs: 60 * 60000 }), manejar(req => sus.iniciarPrueba(req.body)));
 r.get('/paises', manejar(() => sus.paisesRegistro()));
 r.get('/subdominio/:s', limitar({ max: 60 }), manejar(req => sus.subdominioDisponible(req.params.s)));
 r.post('/checkout', limitar({ max: 8, ventanaMs: 10 * 60000 }), manejar(req => sus.iniciar(req.body)));

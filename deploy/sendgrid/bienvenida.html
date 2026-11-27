@@ -8,7 +8,7 @@
   <title>{{asunto}}</title>
   <!-- Plantilla dinámica de SendGrid: BIENVENIDA (Katú POS)
        Asunto de la plantilla: {{asunto}}
-       Variables: asunto, nombre, negocio, dominio, usuario, horas, url_activar, url_panel, url_caja, url_tienda, anio -->
+       Variables: asunto, nombre, negocio, dominio, usuario, horas, url_activar, url_panel, url_caja, url_tienda, anio, prueba, nota_prueba, dias_prueba, prueba_hasta -->
   <style>
     body { margin: 0; padding: 0; }
     a { text-decoration: none; }
@@ -41,7 +41,8 @@
 
         <!-- Llamado principal -->
         <tr><td class="pad" style="padding:34px 36px 8px">
-          <p style="margin:0 0 22px;font-size:16px;line-height:1.6;color:#0B1729">Solo te falta un paso: crea tu contraseña para entrar a tu panel, abrir tu caja y publicar tu tienda en línea.</p>
+          {{#if prueba}}<p style="margin:0 0 18px;padding:14px 16px;border-radius:12px;background:#E6F8FB;font-size:15px;line-height:1.55;color:#0B1729">{{nota_prueba}}</p>{{/if}}
+          <p style="margin:0 0 22px;font-size:16px;line-height:1.6;color:#0B1729">Solo te falta un paso: crea tu contraseña para entrar a tu panel, abrir tu POS y publicar tu tienda en línea.</p>
           <!-- Botón compatible con Outlook -->
           <table role="presentation" cellpadding="0" cellspacing="0" border="0"><tr><td align="center" style="border-radius:14px;background:#0391A6">
             <!--[if mso]><v:roundrect xmlns:v="urn:schemas-microsoft-com:vml" href="{{url_activar}}" style="height:52px;v-text-anchor:middle;width:260px;" arcsize="25%" stroke="f" fillcolor="#0391A6"><w:anchorlock/><center style="color:#ffffff;font-family:Arial;font-size:16px;font-weight:bold;">Crear mi contraseña</center></v:roundrect><![endif]-->

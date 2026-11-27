@@ -35,11 +35,14 @@ const empresaSchema = new mongoose.Schema({
   suscripcion: {
     plan:      String,
     periodo:   { type: String, enum: ['mensual', 'anual'] },
-    estado:    { type: String, enum: ['activa', 'prueba', 'mora', 'cancelada'] },
+    // vencida = terminó la prueba gratis sin pagar: bloqueada hasta suscribirse
+    estado:    { type: String, enum: ['activa', 'prueba', 'mora', 'cancelada', 'vencida'] },
     stripeCliente:     String,
     stripeSuscripcion: String,
     actualHasta: Date,                 // fin del periodo pagado
     moraDesde:   Date,                 // primer cobro fallido (periodo de gracia)
+    pruebaHasta: Date,                 // fin de la prueba gratis sin tarjeta (utils/prueba.js)
+    avisosPrueba: [String],            // correos de la prueba ya enviados: d5, d1, fin
   },
 
   // WhatsApp propio del comercio: subcuenta de Twilio bajo la cuenta de Katú.

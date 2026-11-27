@@ -104,11 +104,17 @@
 
   // ── Planes ──
   const EJEMPLO = [
-    { codigo: 'basico', nombre: 'Básico', descripcion: 'Para empezar a vender rápido y en regla.', moneda: 'USD', precioMensual: 29, precioAnual: 290, caracteristicas: ['Caja rápida con lector y báscula', 'Inventario, compras y vencimientos', 'Factura electrónica (según tu país)', 'Fiado y cartera de clientes', 'Informes y arqueos de turno', 'Funciona sin internet'] },
+    { codigo: 'basico', nombre: 'Básico', descripcion: 'Para empezar a vender rápido y en regla.', moneda: 'USD', precioMensual: 29, precioAnual: 290, caracteristicas: ['POS rápido con lector y báscula', 'Inventario, compras y vencimientos', 'Factura electrónica (según tu país)', 'Fiado y cartera de clientes', 'Informes y arqueos de turno', 'Funciona sin internet'] },
     { codigo: 'pro', nombre: 'Pro', destacado: true, descripcion: 'Vende también a domicilio y por WhatsApp.', moneda: 'USD', precioMensual: 59, precioAnual: 590, caracteristicas: ['Todo lo del plan Básico', 'Tienda en línea con tu subdominio', 'Domicilios con seguimiento y PIN', 'WhatsApp con asistente de IA y asesores', 'Puntos, niveles y misiones para clientes'] },
-    { codigo: 'premium', nombre: 'Premium', descripcion: 'La experiencia completa para crecer.', moneda: 'USD', precioMensual: 99, precioAnual: 990, caracteristicas: ['Todo lo del plan Pro', 'Kiosco de autopago', 'Campañas por WhatsApp y correo', 'Ventas atribuidas a cada campaña', 'Soporte prioritario'] },
+    { codigo: 'premium', nombre: 'Premium', descripcion: 'La experiencia completa para crecer.', moneda: 'USD', precioMensual: 99, precioAnual: 990, caracteristicas: ['Todo lo del plan Pro', 'Software de autopago (el kiosco se cotiza aparte)', 'Campañas por WhatsApp y correo', 'Ventas atribuidas a cada campaña', 'Soporte prioritario'] },
   ];
   let planes = EJEMPLO, periodo = 'mensual', apiLista = false;
+  // Prueba gratis sin tarjeta (la API dice si está activa, cuántos días y con qué plan)
+  let prueba = { dias: 15, plan: 'premium', nombrePlan: 'Premium' };
+  function pintarPrueba() {
+    document.querySelectorAll('.dias-prueba').forEach(x => { x.textContent = prueba ? prueba.dias : ''; });
+    document.querySelectorAll('[data-prueba], [data-prueba-txt]').forEach(x => { x.hidden = !prueba; });
+  }
   function pintarPlanes() {
     $('planesLista').innerHTML = planes.map(p => {
       const anual = periodo === 'anual', precio = anual ? Math.round(p.precioAnual / 12 * 100) / 100 : p.precioMensual;
@@ -118,7 +124,9 @@
         <div class="precio"><b>${cifra(precio, p.moneda)}</b><span>${esc(p.moneda)} / mes</span></div>
         <div class="ahorro">${anual ? `${plata(p.precioAnual, p.moneda)} al año · ahorras ${plata(ahorro, p.moneda)}` : p.diasPrueba ? `${p.diasPrueba} días de prueba gratis` : ''}</div>
         <ul>${(p.caracteristicas || []).map(c => `<li><i class="fa-solid fa-check"></i>${esc(c)}</li>`).join('')}</ul>
-        <button class="btn ${p.destacado ? 'btn-brillo' : 'btn-borde'} btn-xl ancho" data-plan="${esc(p.codigo)}">Elegir ${esc(p.nombre)}</button></article>`;
+        ${prueba
+          ? `<button class="btn ${p.destacado ? 'btn-brillo' : 'btn-borde'} btn-xl ancho" data-prueba-plan="${esc(p.codigo)}">Probar gratis ${esc(prueba.dias)} días</button><button class="enlace-pago" data-plan="${esc(p.codigo)}">o suscribirme ya al plan ${esc(p.nombre)}</button>`
+          : `<button class="btn ${p.destacado ? 'btn-brillo' : 'btn-borde'} btn-xl ancho" data-plan="${esc(p.codigo)}">Elegir ${esc(p.nombre)}</button>`}</article>`;
     }).join('');
   }
   document.querySelector('.selector').onclick = e => {
@@ -133,10 +141,20 @@
       const monedas = [...new Set(planes.map(p => p.moneda))];
       if (monedas.length === 1) $('notaMoneda').textContent = `Precios en ${NOMBRE_MONEDA[monedas[0]] || monedas[0]}.`;
     }
+    if (d.success) { prueba = d.data.prueba || null; pintarPrueba(); pintarPlanes(); }
     if (d.data?.modoPrueba) $('modoPrueba').textContent = 'Pagos en modo de prueba: usa la tarjeta 4242 4242 4242 4242.';
   }).catch(() => {});
-  pintarPlanes();
-  $('planesLista').onclick = e => { const b = e.target.closest('[data-plan]'); if (b) abrirRegistro(b.dataset.plan); };
+  pintarPrueba(); pintarPlanes();
+  $('planesLista').onclick = e => {
+    const b = e.target.closest('[data-plan]'); if (b) return abrirRegistro(b.dataset.plan);
+    if (e.target.closest('[data-prueba-plan]')) abrirRegistro(null, true);
+  };
+  document.addEventListener('click', e => { if (e.target.closest('button[data-prueba]')) abrirRegistro(null, true); });
+
+  // ── Cotización de kioscos de autopago (equipos que se compran aparte) ──
+  const textoCotizacion = 'Hola, quiero cotizar un kiosco de autopago para Katú POS.';
+  const urlCotizacion = K.WHATSAPP ? `https://wa.me/${K.WHATSAPP}?text=${encodeURIComponent(textoCotizacion)}` : `mailto:${K.CONTACTO || 'hola@katupos.com'}?subject=${encodeURIComponent('Cotización de kiosco de autopago')}&body=${encodeURIComponent(textoCotizacion + '\n\nNegocio:\nCiudad y país:\nCuántos kioscos:\n')}`;
+  document.querySelectorAll('[data-cotizar]').forEach(a => { a.href = urlCotizacion; if (K.WHATSAPP) { a.target = '_blank'; a.rel = 'noopener'; } });
 
   // ── Países (Admin → Países decide dónde se ofrece la facturación electrónica) ──
   let paises = [];
@@ -161,9 +179,18 @@
   let planSel = null, subTocado = false, tSub, subOk = false;
   const reg = $('registro');
   const slug = s => String(s || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^a-z0-9-]+/g, '-').replace(/-+/g, '-').replace(/^-|-$/g, '').slice(0, 40);
-  function abrirRegistro(codigo) {
-    planSel = planes.find(p => p.codigo === codigo) || planes[0];
-    $('rPlan').textContent = `Plan ${planSel.nombre}`; $('rPeriodo').value = periodo;
+  // modo prueba: sin pago, con el plan de prueba (Premium); si no, va al Checkout de Stripe
+  let modoPrueba = false;
+  function abrirRegistro(codigo, esPrueba = false) {
+    modoPrueba = !!(esPrueba && prueba);
+    planSel = planes.find(p => p.codigo === (modoPrueba ? prueba.plan : codigo)) || planes[planes.length - 1];
+    $('rPlan').textContent = modoPrueba ? `Prueba gratis · Plan ${prueba.nombrePlan || planSel.nombre}` : `Plan ${planSel.nombre}`;
+    $('rTitulo').textContent = modoPrueba ? `Prueba Katú POS ${prueba.dias} días gratis` : 'Crea tu cuenta';
+    $('rBajada').textContent = modoPrueba ? `Todo el plan ${prueba.nombrePlan || planSel.nombre}, sin tarjeta de crédito. Al terminar eliges tu plan.` : 'En el siguiente paso pagas de forma segura con Stripe.';
+    $('rTelEt').textContent = modoPrueba ? 'Celular (para ayudarte en la prueba)' : 'Celular';
+    $('rCampoPeriodo').hidden = modoPrueba; $('rResumen').hidden = modoPrueba;
+    $('rEnviar').innerHTML = modoPrueba ? '<i class="fa-solid fa-rocket"></i> Crear mi prueba gratis' : '<i class="fa-solid fa-lock"></i> Continuar al pago seguro';
+    $('rPeriodo').value = periodo;
     $('rError').hidden = true; reg.hidden = false; document.body.style.overflow = 'hidden';
     resumen(); notaPais(); setTimeout(() => $('rNegocio').focus(), 60);
   }
@@ -180,7 +207,9 @@
     if (!p || !planSel?.modulos?.facturacion) { n.hidden = true; return; }
     n.hidden = false;
     n.className = 'nota-pais' + (p.facturacion.ofrecida ? ' ok' : '');
-    n.innerHTML = p.facturacion.ofrecida
+    n.innerHTML = p.facturacion.ofrecida && modoPrueba
+      ? `<i class="fa-solid fa-file-invoice"></i> En ${esc(p.nombre)} puedes dejar lista la ${esc((p.facturacion.nombreDocumento || 'factura electrónica').toLowerCase())}${p.facturacion.entidad ? ` (${esc(p.facturacion.entidad)})` : ''} durante la prueba; se emite de verdad desde que te suscribes.`
+      : p.facturacion.ofrecida
       ? `<i class="fa-solid fa-file-invoice"></i> En ${esc(p.nombre)} tu plan incluye ${esc((p.facturacion.nombreDocumento || 'factura electrónica').toLowerCase())}${p.facturacion.entidad ? ` (${esc(p.facturacion.entidad)})` : ''}.`
       : `<i class="fa-solid fa-circle-info"></i> En ${esc(p.nombre)} aún no ofrecemos facturación electrónica: vendes con tiquetes de venta y te avisamos cuando esté disponible.`;
   }
@@ -211,8 +240,20 @@
     if (d.subdominio.length < 3) return err('Elige tu dirección web (mínimo 3 caracteres)');
     if (d.nombre.length < 3) return err('Escribe tu nombre');
     if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(d.correo)) return err('Escribe un correo válido');
+    if (modoPrueba && d.telefono.replace(/\D/g, '').length < 7) return err('Escribe tu celular: lo usamos para ayudarte durante la prueba');
     if (!apiLista) return err('No pudimos conectar con Katú POS. Intenta de nuevo en un momento.');
-    const b = $('rEnviar'); b.disabled = true; b.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Preparando el pago…';
+    const b = $('rEnviar'); b.disabled = true;
+    if (modoPrueba) {
+      b.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Creando tu negocio…';
+      try {
+        const r = await fetch(`${K.API}/registro/prueba`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(d) }).then(x => x.json());
+        if (!r.success) throw new Error(r.error || 'No pudimos crear tu prueba');
+        sessionStorage.setItem('katu_registro', r.data.registro);
+        location.href = `bienvenida.html?r=${encodeURIComponent(r.data.registro)}`;
+      } catch (x) { err(x.message); b.disabled = false; b.innerHTML = '<i class="fa-solid fa-rocket"></i> Crear mi prueba gratis'; }
+      return;
+    }
+    b.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Preparando el pago…';
     try {
       const r = await fetch(`${K.API}/registro/checkout`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(d) }).then(x => x.json());
       if (!r.success) throw new Error(r.error || 'No pudimos iniciar el pago');
@@ -222,4 +263,5 @@
   };
   // Enlaces directos: www.katupos.com/#plan-pro abre el registro
   const h = location.hash.match(/^#plan-(\w+)/); if (h) setTimeout(() => abrirRegistro(h[1]), 300);
+  if (location.hash === '#prueba') setTimeout(() => abrirRegistro(null, true), 300);
 })();

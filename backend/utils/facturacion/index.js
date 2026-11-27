@@ -2,6 +2,7 @@ const Venta = require('../../models/Venta');
 const Devolucion = require('../../models/Devolucion');
 const Empresa = require('../../models/Empresa');
 const { paisDe } = require('../contexto');
+const { enPrueba } = require('../prueba');
 
 // ── Despachador de facturación electrónica por PAÍS ────────────────────────
 // Pais.facturacion.proveedor decide quién emite. Agregar un país es escribir
@@ -14,7 +15,9 @@ const { paisDe } = require('../contexto');
 const PROVEEDORES = { alanube_co: require('./alanubeCo') };
 
 const proveedorDe = pais => PROVEEDORES[pais?.facturacion?.proveedor] || null;
-const activa = (empresa, pais) => !!(empresa.modulos?.facturacion && empresa.facturacion?.activa && empresa.facturacion?.empresaProveedorId && proveedorDe(pais));
+// Durante la prueba gratis se configura todo, pero no se emiten documentos reales:
+// nadie factura gratis y no quedan facturas a medias si no se suscribe.
+const activa = (empresa, pais) => !!(empresa.modulos?.facturacion && empresa.facturacion?.activa && empresa.facturacion?.empresaProveedorId && proveedorDe(pais) && !enPrueba(empresa));
 
 function estadoInicial(empresa, pais, adquiriente) {
   if (!activa(empresa, pais)) return 'no_aplica';

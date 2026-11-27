@@ -3,6 +3,13 @@ const Usuario = require('../models/Usuario');
 const Empresa = require('../models/Empresa');
 const CuentaCliente = require('../models/CuentaCliente');
 const { paisDe } = require('../utils/contexto');
+const { pruebaVencida } = require('../utils/prueba');
+
+// Con la prueba vencida solo se puede cargar el panel, ver la sesión y suscribirse
+const permitidoSinPlan = req => {
+  const ruta = String(req.originalUrl || '').split('?')[0].replace(/\/+$/, '');
+  return ruta.startsWith('/api/v1/cuenta/suscripcion') || ruta.startsWith('/api/v1/auth/') || (req.method === 'GET' && ruta === '/api/v1/configuracion');
+};
 
 // Dos mundos de autenticación que no se mezclan:
 //  - `proteger`:        personal de la empresa (Usuario). Token sin audience.
@@ -41,6 +48,11 @@ const proteger = async (req, res, next) => {
     if (empresaId && /^[a-f\d]{24}$/i.test(String(empresaId))) req.empresa = await Empresa.findById(empresaId).lean();
     if (req.usuario.rol !== 'super' && (!req.empresa || !req.empresa.estado)) {
       return res.status(403).json({ success: false, error: 'La empresa asociada a esta cuenta está inactiva', codigo: 'EMPRESA_INACTIVA' });
+    }
+    // Prueba gratis vencida: la cuenta queda en pausa (sin borrar nada). Solo se puede
+    // entrar al panel para elegir un plan en "Mi suscripción".
+    if (req.usuario.rol !== 'super' && pruebaVencida(req.empresa) && !permitidoSinPlan(req)) {
+      return res.status(402).json({ success: false, error: 'La prueba gratis de tu negocio terminó. El administrador puede elegir un plan en el panel → Mi suscripción, y todo vuelve a funcionar al instante.', codigo: 'PRUEBA_VENCIDA' });
     }
     if (req.empresa) req.pais = await paisDe(req.empresa);
     next();
