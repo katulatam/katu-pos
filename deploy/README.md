@@ -151,11 +151,22 @@ docker run --rm -v /srv/katupos/letsencrypt:/etc/letsencrypt -v /srv/katupos/sec
 
 ## 6. App en los dos servidores
 
-En Portainer, para **app1 y luego app2**: Stacks → Add stack → Repository → este repositorio, archivo `deploy/app/docker-compose.yml`. En "Environment variables" carga las de `deploy/.env.produccion.example`.
+**Cómo llega el código a los servidores:** en cada push a `main`, GitHub Actions (`.github/workflows/imagen.yml`) corre las pruebas, construye la imagen y la publica en el registro privado `ghcr.io/katulatam/katu-pos` (etiquetas `latest` y el SHA del commit). Los servidores solo la descargan: Portainer no puede construir imágenes en environments conectados por agente.
+
+Una sola vez:
+1. Token **clásico** de GitHub con solo `read:packages` → Portainer → **Registries** → Add → Custom registry `ghcr.io` con tu usuario y ese token.
+2. Token **fine-grained** de solo lectura (Contents: Read) del repositorio `katu-pos`, para que Portainer lea el compose.
+
+En Portainer, para **app1 y luego app2**: Stacks → Add stack → **Repository** → `https://github.com/katulatam/katu-pos`, reference `refs/heads/main`, compose path `deploy/app/docker-compose.yml`, autenticación con el token fine-grained. En "Environment variables" (Advanced mode) pega las de `deploy/.env.produccion.example` ya llenas; quedan guardadas en el stack.
 
 - **Idénticas en los dos**, sobre todo `JWT_SECRET`; si no, una sesión iniciada en app1 falla en app2.
 - Las tareas programadas (facturación, campañas, cobros, suspensiones) usan un bloqueo en MongoDB: aunque corran dos contenedores, cada tarea se ejecuta en uno solo a la vez.
-- Para actualizar: Stack → "Pull and redeploy", primero en app1, revisa `https://app.katupos.com/api/v1/health`, y después en app2. nginx deja de enviar tráfico al contenedor que se reinicia.
+
+**Para actualizar:** push a `main` → esperar el check verde en **Actions** → Portainer → katupos-app1 → Stacks → katupos → **Pull and redeploy** (con "Re-pull image") → revisar `https://app.katupos.com/api/v1/health` → lo mismo en katupos-app2. nginx deja de enviar tráfico al contenedor que se reinicia.
+
+**Para volver a una versión anterior:** en el stack, variable `VERSION` = SHA del commit (está en Actions o en `git log`) → Update the stack. Para volver a lo último, `VERSION=latest`.
+
+**Landing:** se sirve desde `/srv/katupos/landing` en el balanceador. Tras cambiarla, cópiala de nuevo: `scp -r landing root@IP_PUBLICA_DE_LB:/srv/katupos/` (no requiere reiniciar nginx).
 
 ## 7. Stripe
 
