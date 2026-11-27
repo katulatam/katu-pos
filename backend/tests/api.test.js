@@ -707,3 +707,51 @@ test('suscripción: landing → Stripe → alta automática, subdominio, mora, s
     st.close(); ['STRIPE_URL', 'STRIPE_SECRET_KEY', 'STRIPE_WEBHOOK_SECRET', 'DOMINIO_BASE'].forEach(k => { process.env[k] = ''; });
   }
 });
+
+test('números de WhatsApp de Katú: comprar, asignar (solo Pro/Premium), activar con plantillas y liberar', async () => {
+  const { crearEmpresa } = require('../utils/empresas');
+  const nueva = async (slug, whatsapp) => (await crearEmpresa({ nombre: slug === 'con-wa' ? 'Con WA' : slug, slug, pais: 'CO', modulos: { whatsapp, domicilios: true } }, { admin: { nombre: 'Admin ' + slug, correo: `admin@${slug}.co` } })).empresa;
+  no(await api('admin', 'GET', '/numeros'), 403);
+  const disp = ok(await api('super', 'GET', '/numeros/disponibles'));
+  assert.ok(disp.length && /^\+1\d{10}$/.test(disp[0].numero));
+  const n1 = ok(await api('super', 'POST', '/numeros', { numero: disp[0].numero }));
+  no(await api('super', 'POST', '/numeros', { numero: disp[0].numero }), 409);
+  no(await api('super', 'POST', '/numeros', { numero: '+573001112233' }), 400);
+
+  const sinWa = await nueva('sin-wa', false), conWa = await nueva('con-wa', true), otra = await nueva('otra-wa', true);
+  assert.match(no(await api('super', 'POST', '/numeros/asignar', { empresa: sinWa._id }), 409).error, /Pro y Premium/);
+  const lista = ok(await api('super', 'GET', '/numeros'));
+  assert.ok(lista.empresas.some(e => String(e._id) === String(conWa._id)));
+  assert.ok(!lista.empresas.some(e => String(e._id) === String(sinWa._id)));
+
+  // Un clic: subcuenta + número del inventario + guía de registro
+  const a = ok(await api('super', 'POST', '/numeros/asignar', { empresa: conWa._id }));
+  assert.deepEqual([a.numero, a.guia.nombreVisible], [n1.numero, 'Con Wa']);
+  no(await api('super', 'POST', '/numeros/asignar', { empresa: conWa._id }), 409);
+  assert.ok((await M('Empresa').findById(conWa._id).lean()).whatsapp.subcuentaSid);
+
+  // Verificado en Twilio → activo, saludo por defecto, plantillas de avisos (aprobadas por el job)
+  assert.deepEqual(ok(await api('super', 'POST', `/numeros/${n1._id}/verificar`)), { activo: true, numero: n1.numero });
+  let ew = await M('Empresa').findById(conWa._id).lean();
+  assert.deepEqual([ew.whatsapp.numero, ew.whatsapp.estado, ew.whatsapp.plantillasAuto.length], [n1.numero, 'activo', 5]);
+  assert.match(ew.whatsapp.bienvenida, /Con Wa/);
+  await require('../utils/whatsapp/numeros').revisar();
+  ew = await M('Empresa').findById(conWa._id).lean();
+  assert.ok(/^HX/.test(ew.whatsapp.plantillas.en_camino) && ew.whatsapp.plantillasAuto.every(p => p.estado === 'aprobada'));
+
+  // Sin números libres: solo compra si se autoriza
+  no(await api('super', 'POST', '/numeros/asignar', { empresa: otra._id }), 409);
+  const a2 = ok(await api('super', 'POST', '/numeros/asignar', { empresa: otra._id, comprarSiFalta: true }));
+  assert.notEqual(a2.numero, n1.numero);
+  const n2 = await M('NumeroWhatsapp').findOne({ numero: a2.numero }).lean();
+  assert.equal(n2.estado, 'asignado');
+
+  // Liberar: la empresa queda sin número y el número vuelve al inventario; dar de baja solo si está libre
+  ok(await api('super', 'POST', `/numeros/${n1._id}/liberar`));
+  ew = await M('Empresa').findById(conWa._id).lean();
+  assert.deepEqual([ew.whatsapp.numero, ew.whatsapp.estado], ['', 'subcuenta']);
+  assert.equal((await M('NumeroWhatsapp').findById(n1._id).lean()).estado, 'disponible');
+  no(await api('super', 'DELETE', `/numeros/${n2._id}`), 409);
+  ok(await api('super', 'DELETE', `/numeros/${n1._id}`));
+  assert.equal(await M('NumeroWhatsapp').countDocuments({ _id: n1._id }), 0);
+});

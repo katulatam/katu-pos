@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Katú POS</title>
+  <link rel="icon" href="../assets/img/favicon.ico">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Sora:wght@500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+  <link rel="stylesheet" href="pos-admin.css">
+</head>
+<body data-pagina="numeros">
+<main class="content"></main>
+<script src="../assets/js/motor.js"></script>
+<script src="pos-admin.js"></script>
+<script>
+(async function () {
+  if (!(await POS.listo)) return;
+  const main = document.querySelector('main');
+  const EST = { disponible: ['Disponible', 'ok'], asignado: ['Esperando registro en WhatsApp', 'av'], activo: ['Activo', 'az'] };
+  main.innerHTML = `<div class="head"><div><h1>Números de WhatsApp</h1><p>Números de EE. UU. de Katú en Twilio. Se asignan a las empresas con plan Pro o Premium: el cliente no tiene que hacer nada.</p></div>
+    <div class="acts"><button class="btn" id="reg"><i class="fa-solid fa-link"></i> Agregar uno ya comprado</button><button class="btn p" id="comp"><i class="fa-solid fa-cart-shopping"></i> Comprar número</button></div></div>
+    <div id="sim"></div>
+    <div class="card"><header><h3>Asignar un número a una empresa</h3></header><div class="b">
+      <div class="lin" style="grid-template-columns:2fr 2fr auto;align-items:end;gap:12px">
+        <div class="f"><label>Empresa (planes con WhatsApp, sin número)</label><select class="in" id="aE"></select></div>
+        <div class="f"><label>Número</label><select class="in" id="aN"></select></div>
+        <button class="btn p" id="asig"><i class="fa-solid fa-bolt"></i> Asignar</button>
+      </div>
+      <label style="display:flex;gap:8px;align-items:center;font-size:13px;margin-top:10px"><input type="checkbox" id="aC" checked> Si no hay números disponibles, comprar uno en Twilio (genera un cobro mensual)</label>
+    </div></div>
+    <div class="card" id="t"></div>`;
+
+  let D = null;
+  async function cargar() {
+    D = await datos('/numeros'); if (!D) return;
+    $('sim').innerHTML = D.simulado ? '<div class="aviso a"><i class="fa-solid fa-flask"></i> Twilio está en modo simulador en este servidor: no se compra ni se registra nada real.</div>' : '';
+    $('aE').innerHTML = D.empresas.length ? D.empresas.map(e => `<option value="${e._id}">${esc(e.nombre)} · ${esc(e.slug)}</option>`).join('') : '<option value="">No hay empresas esperando número</option>';
+    const libres = D.numeros.filter(n => n.estado === 'disponible');
+    $('aN').innerHTML = `<option value="">Automático (${libres.length} disponible${libres.length === 1 ? '' : 's'})</option>` + libres.map(n => `<option value="${n._id}">${esc(n.numero)}${n.zona ? ` · ${esc(n.zona)}` : ''}</option>`).join('');
+    tabla($('t'), [
+      { t: 'Número', f: n => `<b>${esc(n.numero)}</b><small>${esc(n.zona || n.pais)}</small>` },
+      { t: 'Estado', f: n => `<span class="bd ${EST[n.estado][1]}">${EST[n.estado][0]}</span>` },
+      { t: 'Empresa', f: n => n.empresa ? `<b>${esc(n.empresa.nombre)}</b><small>${esc(n.empresa.slug)}</small>` : '<small>—</small>' },
+      { t: 'Desde', f: n => fecha(n.activadoEn || n.asignadoEn || n.createdAt) },
+      { t: '', n: 1, f: n => `<div class="ac">${n.estado === 'asignado' ? `<button class="btn sm" data-g="${n._id}">Guía de registro</button><button class="btn sm p" data-v="${n._id}">Verificar</button>` : ''}${n.empresa ? `<button class="btn sm" data-l="${n._id}">Liberar</button>` : `<button class="btn sm" data-b="${n._id}" title="Dar de baja en Twilio"><i class="fa-solid fa-trash"></i></button>`}</div>` },
+    ], D.numeros, { vacio: 'Aún no hay números. Compra el primero en Twilio.', icono: 'fa-phone' });
+  }
+
+  // Datos para registrar el remitente de WhatsApp en la consola de Twilio
+  function verGuia(g) {
+    const fila = (t, v) => v ? `<div class="fila" style="display:flex;justify-content:space-between;gap:10px;align-items:center;padding:8px 0;border-bottom:1px solid var(--border)"><span><small style="color:var(--muted)">${t}</small><br><b>${esc(v)}</b></span><button class="btn sm" data-copiar="${esc(v)}"><i class="fa-regular fa-copy"></i></button></div>` : '';
+    const m = modal({ clase: 'l', titulo: 'Registrar el WhatsApp en Twilio', html: `
+      <ol style="margin:0 0 14px;padding-left:18px;line-height:1.7;font-size:13.5px">
+        <li>En <b>console.twilio.com</b> cambia a la subcuenta <b>${esc(g.subcuenta)}</b>.</li>
+        <li>Ve a <b>Messaging → Senders → WhatsApp senders</b> y registra el número <b>${esc(g.numero)}</b> con la cuenta de empresa de Katú en Meta. Como el número es de Twilio, la verificación por código es automática.</li>
+        <li>Completa el perfil con los datos de abajo (nombre visible, descripción, sitio web, dirección, logo).</li>
+        <li>Cuando Meta lo apruebe, Katú POS lo activa solo en unos minutos, crea las plantillas de avisos y le escribe al cliente "Tu WhatsApp está listo". También puedes tocar <b>Verificar</b>.</li>
+      </ol>
+      ${fila('Número', g.numero)}${fila('Nombre visible', g.nombreVisible)}${fila('Descripción', g.descripcion)}${fila('Sitio web', g.sitioWeb)}${fila('Dirección', g.direccion)}${fila('Correo', g.correo)}${fila('Logo (URL)', g.logo)}${fila('Subcuenta (SID)', g.subcuentaSid)}`,
+      pie: '<button class="btn p" data-x>Listo</button>' });
+    m.q('.b').addEventListener('click', e => { const b = e.target.closest('[data-copiar]'); if (b) { navigator.clipboard.writeText(b.dataset.copiar); toast('Copiado'); } });
+  }
+
+  $('t').addEventListener('click', async e => {
+    const b = e.target.closest('button'); if (!b) return;
+    if (b.dataset.g) { const g = await datos(`/numeros/${b.dataset.g}/guia`); if (g) verGuia(g); }
+    if (b.dataset.v) { b.disabled = true; const r = await datos(`/numeros/${b.dataset.v}/verificar`, 'POST'); b.disabled = false; if (r) { toast(r.activo ? `¡${r.numero} activo! Le avisamos al cliente por correo.` : 'Aún no aparece registrado como remitente de WhatsApp en Twilio', r.activo ? 'bien' : 'mal'); cargar(); } }
+    if (b.dataset.l && await confirmar('Liberar número', 'La empresa deja de recibir y enviar WhatsApp por este número y vuelve al inventario. El registro de WhatsApp del número se conserva en Twilio.', 'Liberar')) { if (await datos(`/numeros/${b.dataset.l}/liberar`, 'POST')) { toast('Número liberado'); cargar(); } }
+    if (b.dataset.b && await confirmar('Dar de baja el número', 'Se elimina de la cuenta de Twilio y deja de cobrarse. No se puede deshacer: el número se pierde.', 'Dar de baja')) { if (await datos(`/numeros/${b.dataset.b}`, 'DELETE')) { toast('Número dado de baja'); cargar(); } }
+  });
+
+  $('asig').onclick = async () => {
+    if (!$('aE').value) return toast('No hay empresas esperando número', 'mal');
+    $('asig').disabled = true;
+    const r = await datos('/numeros/asignar', 'POST', { empresa: $('aE').value, numero: $('aN').value || undefined, comprarSiFalta: $('aC').checked });
+    $('asig').disabled = false;
+    if (r) { toast(`${r.numero} asignado`); await cargar(); verGuia(r.guia); }
+  };
+
+  $('comp').onclick = () => {
+    const m = modal({ titulo: 'Comprar número en Twilio', html: `<div class="lin" style="grid-template-columns:1fr auto;gap:10px;align-items:end"><div class="f"><label>Código de área (opcional, ej. 305 Miami)</label><input class="in" id="ca" inputmode="numeric" maxlength="3"></div><button class="btn" id="bb"><i class="fa-solid fa-magnifying-glass"></i> Buscar</button></div><div id="ln" style="margin-top:12px"></div><small style="color:var(--muted)">Cada número tiene un cobro mensual en Twilio.</small>`, pie: '<button class="btn" data-x>Cerrar</button>' });
+    const buscar = async () => {
+      m.q('#ln').innerHTML = '<p style="color:var(--muted)"><i class="fa-solid fa-spinner fa-spin"></i> Buscando…</p>';
+      const l = await datos('/numeros/disponibles' + (m.q('#ca').value ? `?codigoArea=${encodeURIComponent(m.q('#ca').value)}` : ''));
+      m.q('#ln').innerHTML = (l || []).map(x => `<div style="display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px solid var(--border)"><span><b>${esc(x.numero)}</b><br><small style="color:var(--muted)">${esc(x.zona)}</small></span><button class="btn sm p" data-n="${esc(x.numero)}">Comprar</button></div>`).join('') || '<p style="color:var(--muted)">No hay números con ese código de área.</p>';
+    };
+    m.q('#bb').onclick = buscar; buscar();
+    m.q('#ln').addEventListener('click', async e => {
+      const b = e.target.closest('[data-n]'); if (!b) return;
+      if (!(await confirmar('Comprar número', `Se compra ${b.dataset.n} en la cuenta de Twilio de Katú y empieza a cobrarse cada mes.`, 'Comprar'))) return;
+      if (await datos('/numeros', 'POST', { numero: b.dataset.n })) { toast('Número comprado'); m.cerrar(); cargar(); }
+    });
+  };
+
+  $('reg').onclick = () => {
+    const m = modal({ clase: 's', titulo: 'Agregar número ya comprado', html: '<div class="f"><label>Número de la cuenta de Twilio de Katú</label><input class="in" id="nr" placeholder="+13055550123"></div>', pie: '<button class="btn p" data-s>Agregar</button>' });
+    m.q('[data-s]').onclick = async () => { if (await datos('/numeros/registrar', 'POST', { numero: m.q('#nr').value })) { toast('Número agregado'); m.cerrar(); cargar(); } };
+  };
+
+  cargar();
+})();
+</script>
+</body>
+</html>

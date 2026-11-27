@@ -189,7 +189,12 @@ const vistaConfig = e => ({
   saldoWhatsapp: e.mensajeria?.saldoWhatsapp || 0, saldoCorreo: e.mensajeria?.saldoCorreo || 0, avisosIncluidos: e.mensajeria?.avisosIncluidos || 0,
   simulador: wa.twilio.simulado(), servidorListo: wa.twilio.disponible(), webhooks: wa.urls(e._id),
 });
-exports.config = manejar(async req => vistaConfig(await Empresa.findById(req.empresa._id).lean()));
+exports.config = manejar(async req => {
+  const e = await Empresa.findById(req.empresa._id).lean();
+  // Número de Katú asignado que espera la aprobación de WhatsApp
+  const prep = await require('../models/NumeroWhatsapp').findOne({ empresa: e._id, estado: 'asignado' }).lean();
+  return { ...vistaConfig(e), preparando: prep?.numero || '' };
+});
 // Lo que ajusta el comercio
 exports.guardarConfig = manejar(async req => {
   const b = req.body, s = {};

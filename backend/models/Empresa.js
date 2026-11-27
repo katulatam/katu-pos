@@ -67,6 +67,8 @@ const empresaSchema = new mongoose.Schema({
       recibido: { type: String, default: '' }, en_camino: { type: String, default: '' }, listo: { type: String, default: '' },
       entregado: { type: String, default: '' }, cancelado: { type: String, default: '' },
     },
+    // Plantillas de avisos creadas solas al activar el número: pasan a `plantillas` cuando Meta las aprueba
+    plantillasAuto: [{ _id: false, evento: String, contentSid: String, estado: { type: String, default: 'pendiente' }, motivo: String }],
   },
   // Bolsa prepagada de mensajes (la recarga Katú): SOLO para campañas de marketing
   mensajeria: {

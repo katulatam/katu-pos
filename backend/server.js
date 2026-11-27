@@ -59,7 +59,7 @@ const rutas = {
   inventario: 'inventario', proveedores: 'proveedores', compras: 'compras', promociones: 'promociones',
   clientes: 'clientes', cartera: 'cartera', misiones: 'misiones', recompensas: 'recompensas',
   pos: 'pos', ventas: 'ventas', cobros: 'cobros', zonas: 'zonas', pedidos: 'pedidos', domiciliario: 'domiciliario',
-  dispositivos: 'dispositivos', facturacion: 'facturacion', reportes: 'reportes', tienda: 'tienda', publico: 'publico', whatsapp: 'whatsapp', marketing: 'marketing', cuenta: 'planes',
+  dispositivos: 'dispositivos', facturacion: 'facturacion', reportes: 'reportes', tienda: 'tienda', publico: 'publico', whatsapp: 'whatsapp', marketing: 'marketing', cuenta: 'planes', numeros: 'numeros',
 };
 Object.entries(rutas).forEach(([ruta, archivo]) => app.use(`/api/v1/${ruta}`, require(`./routes/${archivo}.routes`)));
 app.use('/api/v1/registro', registro.rutas);

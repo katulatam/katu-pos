@@ -105,14 +105,59 @@ async function llamarJSON(cred, metodo, url, datos) {
     throw new ErrorTwilio(`WhatsApp (${e.response?.status || 'sin respuesta'}): ${d?.message || e.message}${d?.code ? ` [${d.code}]` : ''}`, e.response?.status >= 400 && e.response?.status < 500 ? 400 : 502);
   }
 }
-// cuerpo con {{1}} = nombre del cliente. nombre: identificador en minúsculas y guiones bajos
-async function crearPlantilla(subSid, { nombre, cuerpo }) {
+// cuerpo con {{1}} = nombre del cliente. nombre: identificador en minúsculas y guiones bajos.
+// Marketing (campañas) por defecto; los avisos de pedidos van como UTILITY.
+async function crearPlantilla(subSid, { nombre, cuerpo, categoria = 'MARKETING', variables = { 1: 'Cliente' } }) {
   if (simulado()) return { contentSid: 'HX' + crypto.randomBytes(16).toString('hex') };
   const cred = await credSub(subSid);
-  const c = await llamarJSON(cred, 'post', `${CONTENT}/Content`, { friendly_name: nombre, language: 'es', variables: { 1: 'Cliente' }, types: { 'twilio/text': { body: cuerpo } } });
-  await llamarJSON(cred, 'post', `${CONTENT}/Content/${c.sid}/ApprovalRequests/whatsapp`, { name: nombre, category: 'MARKETING' });
+  const c = await llamarJSON(cred, 'post', `${CONTENT}/Content`, { friendly_name: nombre, language: 'es', variables, types: { 'twilio/text': { body: cuerpo } } });
+  await llamarJSON(cred, 'post', `${CONTENT}/Content/${c.sid}/ApprovalRequests/whatsapp`, { name: nombre, category: categoria });
   return { contentSid: c.sid };
 }
+
+// ── Números de Katú (inventario) ───────────────────────────────────────────
+// Se compran en la cuenta maestra y se pasan a la subcuenta de cada empresa.
+const simNumero = () => `+1305555${String(Math.floor(Math.random() * 10000)).padStart(4, '0')}`;
+// Números de EE. UU. disponibles para comprar (con SMS: Twilio verifica solo el remitente de WhatsApp)
+async function buscarNumeros({ pais = 'US', codigoArea } = {}) {
+  if (simulado()) return Array.from({ length: 5 }, () => ({ numero: simNumero(), zona: 'Miami, FL' }));
+  const q = new URLSearchParams({ SmsEnabled: 'true', PageSize: '10', ...(codigoArea && { AreaCode: String(codigoArea) }) });
+  const r = await llamar(maestra(), 'get', `${API}/Accounts/${maestra().sid}/AvailablePhoneNumbers/${pais}/Local.json?${q}`);
+  return (r.available_phone_numbers || []).map(x => ({ numero: x.phone_number, zona: [x.locality, x.region].filter(Boolean).join(', ') }));
+}
+async function comprarNumero(numero, etiqueta = 'Katú POS · WhatsApp') {
+  if (simulado()) return { sid: 'PNsim' + crypto.randomBytes(15).toString('hex'), numero, cuenta: 'ACsimmaestra' };
+  const r = await llamar(maestra(), 'post', `${API}/Accounts/${maestra().sid}/IncomingPhoneNumbers.json`, { PhoneNumber: numero, FriendlyName: etiqueta });
+  return { sid: r.sid, numero: r.phone_number, cuenta: r.account_sid };
+}
+// Un número que ya está en la cuenta maestra (comprado desde la consola)
+async function buscarComprado(numero) {
+  if (simulado()) return { sid: 'PNsim' + crypto.randomBytes(15).toString('hex'), numero, cuenta: 'ACsimmaestra' };
+  const r = await llamar(maestra(), 'get', `${API}/Accounts/${maestra().sid}/IncomingPhoneNumbers.json?PhoneNumber=${encodeURIComponent(numero)}`);
+  const x = (r.incoming_phone_numbers || [])[0];
+  return x ? { sid: x.sid, numero: x.phone_number, cuenta: x.account_sid } : null;
+}
+// Pasa el número de una cuenta a otra (maestra ↔ subcuentas de la misma maestra)
+async function moverNumero(sid, desde, hacia) {
+  if (simulado()) return;
+  await llamar(maestra(), 'post', `${API}/Accounts/${desde}/IncomingPhoneNumbers/${sid}.json`, { AccountSid: hacia });
+}
+async function agregarAServicio(subSid, servicioSid, numeroSid) {
+  if (simulado()) return;
+  const cred = await credSub(subSid);
+  await llamar(cred, 'post', `${MSG}/Services/${servicioSid}/PhoneNumbers`, { PhoneNumberSid: numeroSid }).catch(e => { if (!/21710|already/i.test(e.message)) throw e; });
+}
+async function quitarDeServicio(subSid, servicioSid, numeroSid) {
+  if (simulado()) return;
+  const cred = await credSub(subSid);
+  await llamar(cred, 'delete', `${MSG}/Services/${servicioSid}/PhoneNumbers/${numeroSid}`).catch(() => null);
+}
+// Irreversible: Twilio deja de cobrarlo y el número se pierde
+async function darDeBaja(sid, cuenta) {
+  if (simulado()) return;
+  await llamar(maestra(), 'delete', `${API}/Accounts/${cuenta || maestra().sid}/IncomingPhoneNumbers/${sid}.json`);
+}
+const sidMaestra = () => (simulado() ? 'ACsimmaestra' : maestra().sid);
 // → { estado: aprobada | pendiente | rechazada, motivo }
 async function estadoPlantilla(subSid, contentSid) {
   if (simulado()) return { estado: 'aprobada' };
@@ -122,4 +167,5 @@ async function estadoPlantilla(subSid, contentSid) {
   return { estado: s === 'approved' ? 'aprobada' : ['rejected', 'paused', 'disabled'].includes(s) ? 'rechazada' : 'pendiente', motivo: r?.whatsapp?.rejection_reason || '' };
 }
 
-module.exports = { disponible, simulado, crearSubcuenta, verificarNumero, enviar, firmaValida, descargar, crearPlantilla, estadoPlantilla, ErrorTwilio };
+module.exports = { disponible, simulado, crearSubcuenta, verificarNumero, enviar, firmaValida, descargar, crearPlantilla, estadoPlantilla,
+  buscarNumeros, comprarNumero, buscarComprado, moverNumero, agregarAServicio, quitarDeServicio, darDeBaja, sidMaestra, ErrorTwilio };

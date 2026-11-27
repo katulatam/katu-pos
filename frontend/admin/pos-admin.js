@@ -17,9 +17,9 @@
     ['Inventario', [['inventario', 'Existencias', 'fa-warehouse', 'admin,bodega,supervisor'], ['compras', 'Compras', 'fa-truck-ramp-box', 'admin,bodega'], ['reabastecer', 'Reabastecer', 'fa-wand-magic-sparkles', 'admin,bodega,supervisor'], ['vencimientos', 'Vencimientos', 'fa-hourglass-half', 'admin,bodega,supervisor'], ['proveedores', 'Proveedores', 'fa-handshake-angle', 'admin,bodega']]],
     ['Clientes', [['clientes', 'Clientes', 'fa-users', 'admin,supervisor'], ['marketing', 'Marketing', 'fa-bullhorn', 'admin,supervisor', 'marketing'], ['cartera', 'Fiado', 'fa-handshake', 'admin,supervisor', 'fiado'], ['misiones', 'Misiones', 'fa-bolt', 'admin', 'gamificacion'], ['recompensas', 'Recompensas', 'fa-gift', 'admin', 'gamificacion'], ['gamificacion', 'Reglas del juego', 'fa-gamepad', 'admin', 'gamificacion']]],
     ['Ajustes', [['configuracion', 'Configuración', 'fa-sliders', 'admin'], ['suscripcion', 'Mi suscripción', 'fa-crown', 'admin'], ['medios-pago', 'Medios de pago', 'fa-credit-card', 'admin'], ['facturacion', 'Facturación electrónica', 'fa-file-invoice', 'admin,supervisor', 'facturacion'], ['whatsapp-config', 'WhatsApp y mensajes', 'fa-comment-sms', 'admin,supervisor'], ['sedes', 'Sedes', 'fa-store', 'admin'], ['cajas', 'Cajas y equipos', 'fa-desktop', 'admin'], ['dispositivos', 'Kioscos y datáfonos', 'fa-tablet-screen-button', 'admin'], ['usuarios', 'Usuarios', 'fa-user-gear', 'admin']]],
-    ['Katú', [['empresas', 'Empresas', 'fa-city', 'super'], ['planes', 'Planes y registros', 'fa-tags', 'super'], ['paises', 'Países', 'fa-earth-americas', 'super']]],
+    ['Katú', [['empresas', 'Empresas', 'fa-city', 'super'], ['planes', 'Planes y registros', 'fa-tags', 'super'], ['paises', 'Países', 'fa-earth-americas', 'super'], ['numeros', 'Números de WhatsApp', 'fa-phone', 'super']]],
   ];
-  const SIN_EMPRESA = ['empresas', 'paises', 'planes'];
+  const SIN_EMPRESA = ['empresas', 'paises', 'planes', 'numeros'];
 
   const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
   const iniciales = s => (s || '').split(' ').filter(Boolean).slice(0, 2).map(w => w[0]).join('').toUpperCase();
