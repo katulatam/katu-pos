@@ -54,7 +54,7 @@
     $('pl').onclick = async e => {
       const b = e.target.closest('[data-plan]'); if (!b) return;
       b.disabled = true; b.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Preparando el pago…';
-      const r = await datos('/cuenta/suscripcion/checkout', 'POST', { plan: b.dataset.plan, periodo });
+      const r = await datos('/cuenta/suscripcion/checkout', 'POST', { plan: b.dataset.plan, periodo, origen: location.origin });
       if (r?.url) location.href = r.url; else pintar();
     };
     return;

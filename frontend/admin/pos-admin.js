@@ -217,7 +217,7 @@
       const b = e.target.closest('[data-n]'); if (!b) return;
       if (!d.pagosDisponibles) return toast('Los pagos no están disponibles en este momento', 'mal');
       b.disabled = true; b.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Preparando el pago…';
-      const r = await datos('/cuenta/bolsas/comprar', 'POST', { canal: b.dataset.c, cantidad: Number(b.dataset.n) });
+      const r = await datos('/cuenta/bolsas/comprar', 'POST', { canal: b.dataset.c, cantidad: Number(b.dataset.n), origen: location.origin });
       if (r?.url) location.href = r.url; else { b.disabled = false; b.textContent = 'Comprar'; }
     });
   };

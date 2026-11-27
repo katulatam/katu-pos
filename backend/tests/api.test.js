@@ -792,8 +792,11 @@ test('suscripción: landing → Stripe → alta automática, subdominio, mora, s
     const cat = ok(await api('luis', 'GET', '/cuenta/bolsas'));
     assert.deepEqual(cat.paquetes.map(p => `${p.canal}-${p.cantidad}`), ['correo-5000', 'whatsapp-1000']);
     no(await api('luis', 'POST', '/cuenta/bolsas/comprar', { canal: 'whatsapp', cantidad: 2000 }), 404);
-    const cb = ok(await api('luis', 'POST', '/cuenta/bolsas/comprar', { canal: 'whatsapp', cantidad: 1000 }));
+    const cb = ok(await api('luis', 'POST', '/cuenta/bolsas/comprar', { canal: 'whatsapp', cantidad: 1000, origen: 'https://app.katupos.test' }));
     const pb = recibidosStripe.filter(x => x.u === '/checkout/sessions').pop().body;
+    assert.ok(pb.get('success_url').startsWith('https://app.katupos.test/admin/whatsapp-config.html'), 'vuelve a donde se compró');
+    const { volverA } = require('../utils/empresas');
+    assert.deepEqual([volverA('https://otra.katupos.test', 'x'), volverA('https://malo.com', 'x'), volverA('basura', 'x')], ['https://otra.katupos.test', 'https://x.katupos.test', 'https://x.katupos.test']);
     assert.deepEqual([pb.get('mode'), pb.get('line_items[0][price_data][unit_amount]'), pb.get('metadata[tipo]')], ['payment', '1200', 'bolsa']);
     const antesB = (await M('Empresa').findById(tp._id).lean()).mensajeria?.saldoWhatsapp || 0;
     const sesB = { mode: 'payment', payment_status: 'paid', payment_intent: 'pi_1', metadata: { tipo: 'bolsa', compra: String(cb.compra), empresa: String(tp._id), canal: 'whatsapp', cantidad: '1000' } };

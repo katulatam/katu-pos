@@ -210,7 +210,7 @@ async function checkoutEmpresa(empresa, b) {
   if (!stripe.disponible()) throw new ErrorApi('Los pagos no están disponibles en este momento', 503);
   const Usuario = require('../models/Usuario');
   const admin = await Usuario.findOne({ empresa: e._id, rol: 'admin', estado: true }).sort({ createdAt: 1 }).lean();
-  const volver = `${empresas.urlEmpresa(e.slug)}/admin/suscripcion.html`;
+  const volver = `${empresas.volverA(b.origen, e.slug)}/admin/suscripcion.html`;
   const s = await stripe.crearCheckout({ plan, periodo: b.periodo === 'anual' ? 'anual' : 'mensual', correo: admin?.correo || e.correo, empresaId: e._id,
     exito: `${volver}?sesion={CHECKOUT_SESSION_ID}`, cancelar: volver });
   return { url: s.url };

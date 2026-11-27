@@ -54,4 +54,21 @@ async function usarEnlaceClave(token, password) {
 // https://<slug>.katupos.com (o PUBLIC_URL si no hay dominio base, en desarrollo)
 const urlEmpresa = slug => { const d = String(process.env.DOMINIO_BASE || '').trim(); return d ? `https://${slug}.${d}` : String(process.env.PUBLIC_URL || 'http://localhost:3008').replace(/\/+$/, ''); };
 
-module.exports = { crearEmpresa, slugValido, normalizarSlug, RESERVADOS, enlaceClave, usarEnlaceClave, urlEmpresa };
+// A dónde volver después de pagar en Stripe: a la misma dirección desde donde se
+// compró (la sesión del panel vive por dirección). Solo direcciones de Katú: si el
+// origen no es de confianza, se usa la del negocio.
+function volverA(origen, slug) {
+  const def = urlEmpresa(slug);
+  try {
+    const u = new URL(String(origen || ''));
+    const h = u.hostname.toLowerCase();
+    const publico = (() => { try { return new URL(process.env.PUBLIC_URL).hostname.toLowerCase(); } catch { return ''; } })();
+    // Sin DOMINIO_BASE se deduce del PUBLIC_URL: app.katupos.com → katupos.com
+    const base = String(process.env.DOMINIO_BASE || '').trim().toLowerCase() || (publico.split('.').length >= 3 ? publico.split('.').slice(1).join('.') : '');
+    const deKatu = (base && (h === base || h.endsWith(`.${base}`))) || (publico && h === publico) || (process.env.NODE_ENV !== 'production' && ['localhost', '127.0.0.1'].includes(h));
+    if (!deKatu || !['https:', 'http:'].includes(u.protocol) || (u.protocol === 'http:' && process.env.NODE_ENV === 'production')) return def;
+    return u.origin;
+  } catch { return def; }
+}
+
+module.exports = { crearEmpresa, slugValido, normalizarSlug, RESERVADOS, enlaceClave, usarEnlaceClave, urlEmpresa, volverA };

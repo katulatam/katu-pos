@@ -38,7 +38,7 @@ async function catalogo(empresa) {
   return { paquetes, moneda, pagosDisponibles: stripe.disponible(), modoPrueba: stripe.modoPrueba(), saldo: { whatsapp: e.mensajeria?.saldoWhatsapp || 0, correo: e.mensajeria?.saldoCorreo || 0 }, compras };
 }
 
-async function comprar(empresa, usuario, { canal, cantidad }) {
+async function comprar(empresa, usuario, { canal, cantidad, origen }) {
   const pais = await paisDe(empresa);
   const p = (pais.bolsas?.paquetes || []).find(x => x.canal === canal && x.cantidad === Number(cantidad));
   if (!p) throw new ErrorApi('Ese paquete no está disponible en tu país', 404);
@@ -47,7 +47,7 @@ async function comprar(empresa, usuario, { canal, cantidad }) {
   const admin = await Usuario.findById(usuario).select('correo').lean();
   const moneda = pais.bolsas?.moneda || 'USD';
   const compra = await CompraBolsa.create({ empresa: e._id, canal, cantidad: p.cantidad, precio: p.precio, moneda, usuario });
-  const volver = `${empresas.urlEmpresa(e.slug)}/admin/whatsapp-config.html`;
+  const volver = `${empresas.volverA(origen, e.slug)}/admin/whatsapp-config.html`;
   const s = await stripe.crearPago({
     nombre: `Katú POS · ${miles(p.cantidad)} ${NOMBRE[canal]} para marketing`, monto: p.precio, moneda,
     correo: admin?.correo || e.correo, cliente: e.suscripcion?.stripeCliente, referencia: compra._id,
