@@ -1,0 +1,60 @@
+<!doctype html>
+<html lang="es" xmlns="http://www.w3.org/1999/xhtml">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="x-apple-disable-message-reformatting">
+  <meta name="color-scheme" content="light only">
+  <title>{{asunto}}</title>
+  <!-- Plantilla dinámica de SendGrid: RECUPERAR CONTRASEÑA (Katú POS)
+       Asunto de la plantilla: {{asunto}}
+       Variables: asunto, nombre, negocio, url_activar, horas, anio -->
+  <style>
+    body { margin: 0; padding: 0; }
+    a { text-decoration: none; }
+    @media (max-width: 620px) { .contenedor { width: 100% !important; border-radius: 0 !important; } .pad { padding-left: 24px !important; padding-right: 24px !important; } }
+  </style>
+</head>
+<body style="margin:0;padding:0;background:#EEF2F7;font-family:'Segoe UI',Arial,Helvetica,sans-serif;color:#0B1729">
+  <div style="display:none;max-height:0;overflow:hidden;opacity:0;color:#EEF2F7">Crea una contraseña nueva para entrar a {{negocio}} en Katú POS.&#847;&zwnj;&nbsp;&#847;&zwnj;&nbsp;</div>
+
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background:#EEF2F7">
+    <tr><td align="center" style="padding:32px 12px">
+      <table role="presentation" class="contenedor" width="560" cellpadding="0" cellspacing="0" border="0" style="width:560px;max-width:560px;background:#FFFFFF;border-radius:22px;overflow:hidden;box-shadow:0 18px 40px -22px rgba(15,30,60,.35)">
+
+        <tr><td class="pad" style="background:#060B16;background-image:linear-gradient(135deg,#0B2236 0%,#060B16 60%,#1A1340 100%);padding:24px 36px">
+          <table role="presentation" cellpadding="0" cellspacing="0" border="0"><tr>
+            <td style="width:36px;height:36px;border-radius:11px;background:#05C3DD;background-image:linear-gradient(135deg,#05C3DD,#7C6CFF);text-align:center;vertical-align:middle;font-size:18px;line-height:36px;color:#FFFFFF">&#9889;</td>
+            <td style="padding-left:12px;font-size:19px;font-weight:800;color:#FFFFFF">Katú <span style="color:#05C3DD">POS</span></td>
+          </tr></table>
+        </td></tr>
+
+        <tr><td class="pad" style="padding:34px 36px 10px">
+          <div style="width:56px;height:56px;border-radius:16px;background:#E3F7FA;text-align:center;line-height:56px;font-size:26px">&#128273;</div>
+          <p style="margin:20px 0 10px;font-size:24px;font-weight:800;letter-spacing:-.4px;color:#0B1729">Hola, {{nombre}}</p>
+          <p style="margin:0 0 24px;font-size:16px;line-height:1.6;color:#0B1729">Recibimos una solicitud para crear una contraseña nueva en <strong>{{negocio}}</strong>. Toca el botón para elegirla:</p>
+          <table role="presentation" cellpadding="0" cellspacing="0" border="0"><tr><td align="center" style="border-radius:14px;background:#0391A6">
+            <!--[if mso]><v:roundrect xmlns:v="urn:schemas-microsoft-com:vml" href="{{url_activar}}" style="height:50px;v-text-anchor:middle;width:260px;" arcsize="25%" stroke="f" fillcolor="#0391A6"><w:anchorlock/><center style="color:#ffffff;font-family:Arial;font-size:16px;font-weight:bold;">Crear contraseña nueva</center></v:roundrect><![endif]-->
+            <!--[if !mso]><!--><a href="{{url_activar}}" target="_blank" style="display:inline-block;padding:15px 32px;font-size:16px;font-weight:700;color:#FFFFFF;background:#0391A6;background-image:linear-gradient(100deg,#05C3DD,#0391A6);border-radius:14px">Crear contraseña nueva &rarr;</a><!--<![endif]-->
+          </td></tr></table>
+          <p style="margin:14px 0 0;font-size:13px;line-height:1.5;color:#51637F">El enlace vence en {{horas}} horas y sirve una sola vez.</p>
+        </td></tr>
+
+        <tr><td class="pad" style="padding:22px 36px 30px">
+          <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0"><tr>
+            <td style="background:#FFF4DF;border-radius:14px;padding:14px 16px;font-size:13.5px;line-height:1.5;color:#7A4A00">
+              <strong>¿No fuiste tú?</strong> Ignora este correo: tu contraseña actual sigue funcionando y nadie puede cambiarla sin este enlace.
+            </td>
+          </tr></table>
+        </td></tr>
+
+        <tr><td class="pad" style="background:#F4F7FB;border-top:1px solid #E1E8F1;padding:20px 36px;font-size:12.5px;line-height:1.6;color:#51637F">
+          Si el botón no funciona, copia este enlace en tu navegador:<br>
+          <a href="{{url_activar}}" style="color:#0391A6;word-break:break-all">{{url_activar}}</a><br><br>
+          © {{anio}} Katú · Hecho en Colombia
+        </td></tr>
+      </table>
+    </td></tr>
+  </table>
+</body>
+</html>

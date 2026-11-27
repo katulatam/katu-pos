@@ -37,4 +37,26 @@ async function enviar({ a, asunto, html, texto, nombreRemitente, responderA, baj
   }
 }
 
-module.exports = { enviar, disponible, simulado };
+// Plantilla dinámica de SendGrid (d-…), como en katu_school: el diseño y los textos
+// se editan en el panel de SendGrid; aquí solo van los datos. El asunto de la
+// plantilla debe usar la variable {{asunto}}.
+async function enviarPlantilla({ a, plantilla, datos, nombreRemitente, responderA, etiquetas }) {
+  if (simulado()) return { id: 'sgsim' + crypto.randomBytes(12).toString('hex') };
+  const { apiKey, from, url } = config();
+  if (!apiKey || !from) throw new Error('El correo no está configurado en el servidor (SENDGRID_API_KEY / SENDGRID_FROM)');
+  try {
+    const r = await axios.post(`${url}/mail/send`, {
+      personalizations: [{ to: [{ email: a }], dynamic_template_data: datos }],
+      from: { email: from, name: String(nombreRemitente || 'Katú POS').slice(0, 60) },
+      ...(responderA && { reply_to: { email: responderA } }),
+      template_id: plantilla,
+      ...(etiquetas && { custom_args: Object.fromEntries(Object.entries(etiquetas).map(([k, v]) => [k, String(v)])) }),
+    }, { headers: { Authorization: `Bearer ${apiKey}`, 'Content-Type': 'application/json' }, timeout: 20000 });
+    return { id: r.headers['x-message-id'] || '' };
+  } catch (e) {
+    const d = e.response?.data;
+    throw new Error(`Correo (${e.response?.status || 'sin respuesta'}): ${d?.errors?.map(x => x.message).join('; ') || e.message}`);
+  }
+}
+
+module.exports = { enviar, enviarPlantilla, disponible, simulado };

@@ -1,0 +1,99 @@
+<!doctype html>
+<html lang="es" xmlns="http://www.w3.org/1999/xhtml">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="x-apple-disable-message-reformatting">
+  <meta name="color-scheme" content="light only">
+  <title>{{asunto}}</title>
+  <!-- Plantilla dinámica de SendGrid: BIENVENIDA (Katú POS)
+       Asunto de la plantilla: {{asunto}}
+       Variables: asunto, nombre, negocio, dominio, usuario, horas, url_activar, url_panel, url_caja, url_tienda, anio -->
+  <style>
+    body { margin: 0; padding: 0; }
+    a { text-decoration: none; }
+    @media (max-width: 620px) {
+      .contenedor { width: 100% !important; border-radius: 0 !important; }
+      .pad { padding-left: 24px !important; padding-right: 24px !important; }
+      .titulo { font-size: 26px !important; }
+      .col { display: block !important; width: 100% !important; }
+    }
+  </style>
+</head>
+<body style="margin:0;padding:0;background:#EEF2F7;font-family:'Segoe UI',Arial,Helvetica,sans-serif;color:#0B1729;-webkit-font-smoothing:antialiased">
+  <!-- Texto de vista previa (lo que se ve en la bandeja junto al asunto) -->
+  <div style="display:none;max-height:0;overflow:hidden;opacity:0;color:#EEF2F7">Tu negocio {{negocio}} ya está listo. Crea tu contraseña y empieza a vender hoy.&#847;&zwnj;&nbsp;&#847;&zwnj;&nbsp;&#847;&zwnj;&nbsp;</div>
+
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background:#EEF2F7">
+    <tr><td align="center" style="padding:32px 12px">
+
+      <table role="presentation" class="contenedor" width="600" cellpadding="0" cellspacing="0" border="0" style="width:600px;max-width:600px;background:#FFFFFF;border-radius:22px;overflow:hidden;box-shadow:0 18px 40px -22px rgba(15,30,60,.35)">
+
+        <!-- Encabezado -->
+        <tr><td style="background:#060B16;background-image:linear-gradient(135deg,#0B2236 0%,#060B16 55%,#1A1340 100%);padding:28px 36px" class="pad">
+          <table role="presentation" cellpadding="0" cellspacing="0" border="0"><tr>
+            <td style="width:40px;height:40px;border-radius:12px;background:#05C3DD;background-image:linear-gradient(135deg,#05C3DD,#7C6CFF);text-align:center;vertical-align:middle;font-size:20px;line-height:40px;color:#FFFFFF">&#9889;</td>
+            <td style="padding-left:12px;font-size:21px;font-weight:800;color:#FFFFFF;letter-spacing:-.3px">Katú <span style="color:#05C3DD">POS</span></td>
+          </tr></table>
+          <p class="titulo" style="margin:30px 0 8px;font-size:30px;line-height:1.15;font-weight:800;color:#FFFFFF;letter-spacing:-.6px">¡Bienvenido, {{nombre}}!</p>
+          <p style="margin:0;font-size:16px;line-height:1.55;color:#C9D7EE"><strong style="color:#FFFFFF">{{negocio}}</strong> ya está listo para vender en <strong style="color:#05C3DD;white-space:nowrap">{{dominio}}</strong></p>
+        </td></tr>
+
+        <!-- Llamado principal -->
+        <tr><td class="pad" style="padding:34px 36px 8px">
+          <p style="margin:0 0 22px;font-size:16px;line-height:1.6;color:#0B1729">Solo te falta un paso: crea tu contraseña para entrar a tu panel, abrir tu caja y publicar tu tienda en línea.</p>
+          <!-- Botón compatible con Outlook -->
+          <table role="presentation" cellpadding="0" cellspacing="0" border="0"><tr><td align="center" style="border-radius:14px;background:#0391A6">
+            <!--[if mso]><v:roundrect xmlns:v="urn:schemas-microsoft-com:vml" href="{{url_activar}}" style="height:52px;v-text-anchor:middle;width:260px;" arcsize="25%" stroke="f" fillcolor="#0391A6"><w:anchorlock/><center style="color:#ffffff;font-family:Arial;font-size:16px;font-weight:bold;">Crear mi contraseña</center></v:roundrect><![endif]-->
+            <!--[if !mso]><!--><a href="{{url_activar}}" target="_blank" style="display:inline-block;padding:16px 34px;font-size:16px;font-weight:700;color:#FFFFFF;background:#0391A6;background-image:linear-gradient(100deg,#05C3DD,#0391A6);border-radius:14px">Crear mi contraseña &rarr;</a><!--<![endif]-->
+          </td></tr></table>
+          <p style="margin:14px 0 0;font-size:13px;line-height:1.5;color:#51637F">El enlace vence en {{horas}} horas. Tu usuario es <strong style="color:#0B1729">{{usuario}}</strong>.</p>
+        </td></tr>
+
+        <!-- Accesos -->
+        <tr><td class="pad" style="padding:28px 36px 6px">
+          <p style="margin:0 0 12px;font-size:13px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:#0391A6">Tus accesos</p>
+          <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
+            <tr>
+              <td class="col" width="33%" style="padding:0 6px 10px 0;vertical-align:top">
+                <a href="{{url_panel}}" target="_blank" style="display:block;background:#F4F7FB;border:1px solid #E1E8F1;border-radius:14px;padding:16px;color:#0B1729">
+                  <span style="font-size:22px">&#128202;</span><br><strong style="font-size:15px">Panel</strong><br><span style="font-size:12.5px;color:#51637F">Productos, ventas e informes</span>
+                </a>
+              </td>
+              <td class="col" width="33%" style="padding:0 3px 10px;vertical-align:top">
+                <a href="{{url_caja}}" target="_blank" style="display:block;background:#F4F7FB;border:1px solid #E1E8F1;border-radius:14px;padding:16px;color:#0B1729">
+                  <span style="font-size:22px">&#128722;</span><br><strong style="font-size:15px">Caja</strong><br><span style="font-size:12.5px;color:#51637F">Cobra con lector y báscula</span>
+                </a>
+              </td>
+              <td class="col" width="33%" style="padding:0 0 10px 6px;vertical-align:top">
+                <a href="{{url_tienda}}" target="_blank" style="display:block;background:#F4F7FB;border:1px solid #E1E8F1;border-radius:14px;padding:16px;color:#0B1729">
+                  <span style="font-size:22px">&#127978;</span><br><strong style="font-size:15px">Tienda</strong><br><span style="font-size:12.5px;color:#51637F">Tus clientes piden en línea</span>
+                </a>
+              </td>
+            </tr>
+          </table>
+        </td></tr>
+
+        <!-- Primeros pasos -->
+        <tr><td class="pad" style="padding:20px 36px 30px">
+          <p style="margin:0 0 12px;font-size:13px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:#0391A6">Empieza en 3 pasos</p>
+          <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="font-size:15px;line-height:1.5;color:#0B1729">
+            <tr><td width="34" style="vertical-align:top;padding:6px 0"><span style="display:inline-block;width:24px;height:24px;border-radius:50%;background:#05C3DD;color:#FFFFFF;font-size:13px;font-weight:700;text-align:center;line-height:24px">1</span></td><td style="padding:6px 0">Crea tu contraseña con el botón de arriba.</td></tr>
+            <tr><td width="34" style="vertical-align:top;padding:6px 0"><span style="display:inline-block;width:24px;height:24px;border-radius:50%;background:#05C3DD;color:#FFFFFF;font-size:13px;font-weight:700;text-align:center;line-height:24px">2</span></td><td style="padding:6px 0">Carga tus productos, uno a uno o desde Excel.</td></tr>
+            <tr><td width="34" style="vertical-align:top;padding:6px 0"><span style="display:inline-block;width:24px;height:24px;border-radius:50%;background:#05C3DD;color:#FFFFFF;font-size:13px;font-weight:700;text-align:center;line-height:24px">3</span></td><td style="padding:6px 0">Abre tu caja y haz tu primera venta.</td></tr>
+          </table>
+        </td></tr>
+
+        <!-- Pie -->
+        <tr><td class="pad" style="background:#F4F7FB;border-top:1px solid #E1E8F1;padding:22px 36px;font-size:12.5px;line-height:1.6;color:#51637F">
+          Si el botón no funciona, copia este enlace en tu navegador:<br>
+          <a href="{{url_activar}}" style="color:#0391A6;word-break:break-all">{{url_activar}}</a><br><br>
+          Recibes este correo porque te suscribiste a Katú POS con {{usuario}}.<br>
+          © {{anio}} Katú · Hecho en Colombia
+        </td></tr>
+      </table>
+
+    </td></tr>
+  </table>
+</body>
+</html>

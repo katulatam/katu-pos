@@ -85,8 +85,33 @@ async function correoBienvenida(reg, empresa, usuario, token) {
 <p style="margin:22px 0"><a href="${activar}" style="background:#0391A6;color:#fff;text-decoration:none;padding:14px 26px;border-radius:12px;font-weight:bold;display:inline-block">Crear mi contraseña</a></p>
 <p style="margin:0 0 6px;color:#51637F;font-size:13px">El enlace vence en 72 horas. Tu usuario es ${usuario.correo}.</p>
 <p style="margin:18px 0 0">Panel: <a href="${url}/admin/">${url}/admin/</a><br>Caja: <a href="${url}/pos/">${url}/pos/</a><br>Tienda en línea: <a href="${url}/">${url}/</a></p></td></tr></table></td></tr></table></body></html>`;
-  await correo.enviar({ a: usuario.correo, asunto: `¡${empresa.nombre} ya está en Katú POS!`, html, texto, nombreRemitente: 'Katú POS' }).catch(e => console.error('[suscripcion.bienvenida]', e.message));
-  return activar;
+  const asunto = `¡${empresa.nombre} ya está en Katú POS!`;
+  const plantilla = String(process.env.SENDGRID_TEMPLATE_BIENVENIDA || '').trim();
+  // Con plantilla de SendGrid (se edita en su panel); sin ella, el diseño de aquí
+  const envio = plantilla
+    ? correo.enviarPlantilla({ a: usuario.correo, plantilla, nombreRemitente: 'Katú POS', etiquetas: { tipo: 'bienvenida', empresa: empresa._id },
+        datos: { asunto, nombre: reg.nombre.split(' ')[0], negocio: empresa.nombre, dominio: url.replace(/^https?:\/\//, ''), usuario: usuario.correo, horas: 72,
+          url_activar: activar, url_panel: `${url}/admin/`, url_caja: `${url}/pos/`, url_tienda: `${url}/`, anio: new Date().getFullYear() } })
+    : correo.enviar({ a: usuario.correo, asunto, html, texto, nombreRemitente: 'Katú POS' });
+  try {
+    const r = await envio;
+    console.log(`[correo] bienvenida enviada a ${usuario.correo}${plantilla ? ' (plantilla)' : ''} id=${r.id || '-'}`);
+    return { activar, enviado: true };
+  } catch (e) {
+    console.error(`[correo] bienvenida NO enviada a ${usuario.correo}: ${e.message}`);
+    return { activar, enviado: false, error: e.message };
+  }
+}
+
+// Reenvío desde el admin de Katú: enlace nuevo de 72 h (el anterior deja de servir)
+async function reenviarBienvenida(registroId) {
+  const Usuario = require('../models/Usuario');
+  const reg = /^[a-f\d]{24}$/i.test(String(registroId)) ? await Registro.findById(registroId).lean() : null;
+  if (!reg || reg.estado !== 'listo' || !reg.empresa) throw new ErrorApi('Solo se reenvía a registros con la cuenta ya creada', 409);
+  const empresa = await Empresa.findById(reg.empresa).lean();
+  const usuario = await Usuario.findOne({ empresa: reg.empresa, rol: 'admin', correo: reg.correo }).lean() || await Usuario.findOne({ empresa: reg.empresa, rol: 'admin' }).lean();
+  if (!empresa || !usuario) throw new ErrorApi('No se encontró la empresa o su administrador', 404);
+  return correoBienvenida(reg, empresa, usuario, await empresas.enlaceClave(usuario._id));
 }
 
 // Idempotente: Stripe puede reenviar el mismo evento
@@ -169,4 +194,4 @@ async function portal(empresa) {
   return { url: s.url };
 }
 
-module.exports = { PLANES_EJEMPLO, MODULOS, sembrarPlanes, planesActivos, planPublico, subdominioDisponible, iniciar, estadoRegistro, provisionar, procesarEvento, suspenderVencidas, portal, DIAS_GRACIA };
+module.exports = { reenviarBienvenida, PLANES_EJEMPLO, MODULOS, sembrarPlanes, planesActivos, planPublico, subdominioDisponible, iniciar, estadoRegistro, provisionar, procesarEvento, suspenderVencidas, portal, DIAS_GRACIA };

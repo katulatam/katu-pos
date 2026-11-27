@@ -29,6 +29,7 @@ r.get('/planes', soloSuper, manejar(() => Plan.find().sort({ orden: 1 }).lean())
 r.post('/planes', soloSuper, manejar(async (req, res) => { const codigo = String(req.body.codigo || '').toLowerCase().trim(); if (!/^[a-z0-9-]{2,30}$/.test(codigo)) throw new ErrorApi('Código inválido'); const p = await Plan.create({ ...tomar(req.body), codigo }); res.status(201); return p; }));
 r.put('/planes/:id', soloSuper, manejar(async req => { const p = await Plan.findByIdAndUpdate(req.params.id, tomar(req.body), { new: true, runValidators: true }).lean(); if (!p) throw new ErrorApi('El plan no existe', 404); return p; }));
 r.get('/registros', soloSuper, manejar(() => Registro.find().sort({ createdAt: -1 }).limit(300).lean()));
+r.post('/registros/:id/reenviar', soloSuper, manejar(req => sus.reenviarBienvenida(req.params.id)));
 r.post('/registros/:id/reintentar', soloSuper, manejar(async req => {
   const g = await Registro.findOneAndUpdate({ _id: req.params.id, estado: 'error' }, { estado: 'pendiente' }, { new: true }).lean();
   if (!g) throw new ErrorApi('Solo se reintentan registros con error', 409);

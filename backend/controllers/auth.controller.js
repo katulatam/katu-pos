@@ -37,7 +37,14 @@ exports.olvide = manejar(async req => {
     if (e) {
       const token = await emp.enlaceClave(u._id, { horas: 2 });
       const url = `${emp.urlEmpresa(e.slug)}/admin/activar.html?t=${token}&r=1`;
-      await require('../utils/correo/sendgrid').enviar({ a: u.correo, asunto: 'Recupera tu contraseña de Katú POS', nombreRemitente: 'Katú POS', texto: `Hola ${u.nombre.split(' ')[0]}:\n\nPara crear una contraseña nueva entra aquí (vence en 2 horas):\n${url}\n\nSi no la pediste, ignora este correo.`, html: `<p>Hola ${u.nombre.split(' ')[0].replace(/[<>&]/g, '')}:</p><p>Para crear una contraseña nueva entra aquí (vence en 2 horas):</p><p><a href="${url}">Crear contraseña nueva</a></p><p style="color:#51637F">Si no la pediste, ignora este correo.</p>` }).catch(err => console.error('[auth.olvide]', err.message));
+      const sg = require('../utils/correo/sendgrid'), nombre = u.nombre.split(' ')[0], asunto = 'Recupera tu contraseña de Katú POS';
+      const plantilla = String(process.env.SENDGRID_TEMPLATE_RECUPERAR || '').trim();
+      try {
+        const r = plantilla
+          ? await sg.enviarPlantilla({ a: u.correo, plantilla, nombreRemitente: 'Katú POS', etiquetas: { tipo: 'recuperar' }, datos: { asunto, nombre, negocio: e.nombre, url_activar: url, horas: 2, anio: new Date().getFullYear() } })
+          : await sg.enviar({ a: u.correo, asunto, nombreRemitente: 'Katú POS', texto: `Hola ${nombre}:\n\nPara crear una contraseña nueva entra aquí (vence en 2 horas):\n${url}\n\nSi no la pediste, ignora este correo.`, html: `<p>Hola ${nombre.replace(/[<>&]/g, '')}:</p><p>Para crear una contraseña nueva entra aquí (vence en 2 horas):</p><p><a href="${url}">Crear contraseña nueva</a></p><p style="color:#51637F">Si no la pediste, ignora este correo.</p>` });
+        console.log(`[correo] recuperación enviada a ${u.correo}${plantilla ? ' (plantilla)' : ''} id=${r.id || '-'}`);
+      } catch (err) { console.error(`[correo] recuperación NO enviada a ${u.correo}: ${err.message}`); }
     }
   }
   return { ok: true };
