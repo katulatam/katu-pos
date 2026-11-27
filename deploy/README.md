@@ -197,3 +197,53 @@ En Portainer, para **app1 y luego app2**: Stacks → Add stack → **Repository*
 - [ ] `https://<subdominio>.katupos.com` muestra la tienda en línea.
 - [ ] Webhooks de Twilio y Alanube apuntando a `PUBLIC_URL`.
 - [ ] Respaldo de Mongo del día siguiente existe y se puede restaurar.
+- [ ] **Antes del primer cliente real:** copia del respaldo a Object Storage (paso 9).
+
+## 9. Respaldo fuera del servidor (Object Storage) — pendiente para el primer cliente real
+
+El respaldo diario vive en app1. Si se pierde app1 completo, el respaldo se va con él (la réplica en app2 también copia los errores, como un borrado accidental). Object Storage guarda una copia **cifrada** fuera de los servidores. Costo de referencia: ~US$5/mes, cobrado desde que se crea el primer bucket.
+
+1. **Cloud Manager → Object Storage → Create Bucket:** `katupos-respaldos`, región **Miami**. Anota el endpoint de la región (ej. `us-mia-1.linodeobjects.com`).
+2. **Access Keys → Create Access Key:** `respaldo-app1`, **Limited Access** con Read/Write solo en `katupos-respaldos`. Guarda el Access Key y el Secret Key.
+3. **Claves de cifrado** (en app1): `openssl rand -hex 32` dos veces → `RESPALDO_CLAVE_1` y `RESPALDO_CLAVE_2`. Guárdalas **fuera de los servidores**: sin ellas los respaldos no se pueden recuperar.
+4. **Configurar rclone en app1:**
+   ```bash
+   docker pull rclone/rclone
+   mkdir -p /srv/katupos/rclone && chmod 700 /srv/katupos/rclone
+   docker run --rm -v /srv/katupos/rclone:/config/rclone \
+    rclone/rclone config create linode s3 \
+    provider=Linode access_key_id=TU_ACCESS_KEY \
+    secret_access_key=TU_SECRET_KEY \
+    endpoint=us-mia-1.linodeobjects.com acl=private
+   docker run --rm -v /srv/katupos/rclone:/config/rclone \
+    rclone/rclone config create respaldos crypt \
+    remote=linode:katupos-respaldos \
+    password=RESPALDO_CLAVE_1 password2=RESPALDO_CLAVE_2
+   chmod 600 /srv/katupos/rclone/rclone.conf
+   ```
+5. **Agregar al final de `/srv/katupos/respaldo.sh`** (sube cada noche y borra en la nube lo de más de 60 días):
+   ```sh
+   docker run --rm \
+    -v /srv/katupos/rclone:/config/rclone \
+    -v $D:/data:ro rclone/rclone \
+    copy /data respaldos: \
+    --include 'katu_pos-*.gz' --quiet
+   docker run --rm \
+    -v /srv/katupos/rclone:/config/rclone \
+    rclone/rclone delete respaldos: \
+    --min-age 60d --quiet
+   ```
+6. **Probar:** `sh /srv/katupos/respaldo.sh` y luego
+   `docker run --rm -v /srv/katupos/rclone:/config/rclone rclone/rclone ls respaldos:` (nombres reales) — en Cloud Manager el bucket muestra nombres ilegibles: el cifrado funciona.
+
+### Restaurar un respaldo
+
+```bash
+# 1. Traer el archivo del día (desde la nube, si app1 ya no existe; o usar el de /srv/katupos/backups)
+docker run --rm -v /srv/katupos/rclone:/config/rclone -v /srv/katupos/backups:/data \
+ rclone/rclone copy respaldos:katu_pos-AAAA-MM-DD.gz /data
+# 2. Restaurarlo sobre la base (--drop reemplaza las colecciones por las del respaldo)
+docker exec -i katupos-mongo sh -c 'mongorestore -u root -p "$MONGO_INITDB_ROOT_PASSWORD" \
+ --authenticationDatabase admin --archive --gzip --drop' < /srv/katupos/backups/katu_pos-AAAA-MM-DD.gz
+```
+Hazlo en el nodo PRIMARY. `--drop` borra los datos actuales de cada colección antes de restaurar: confirma la fecha antes de correrlo.
