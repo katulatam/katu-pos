@@ -414,7 +414,7 @@ test('WhatsApp: módulo por empresa, bandeja, ventana de 24 h, pedido desde el c
   await M('Conversacion').updateOne({ _id: id }, { ultimaEntrante: new Date(Date.now() - 25 * 3600000) });
   assert.equal(no(await api('admin', 'POST', `/whatsapp/conversaciones/${id}/mensajes`, { texto: 'hola?' }), 409).codigo, 'VENTANA_CERRADA');
 
-  // Bolsa: campaña sin saldo se bloquea; aviso de pedido con plantilla consume aunque quede en negativo
+  // Bolsa solo para marketing: campaña sin saldo se bloquea; el aviso de pedido con plantilla no la toca
   const wa = require('../utils/whatsapp');
   const emp = await M('Empresa').findById(e._id).lean();
   await assert.rejects(wa.enviarPlantilla({ empresa: emp, telefono: '+573010001122', plantilla: 'HX' + '0'.repeat(32), tipo: 'marketing' }), /agotada/);
@@ -426,10 +426,11 @@ test('WhatsApp: módulo por empresa, bandeja, ventana de 24 h, pedido desde el c
   ok(await api('admin', 'PUT', `/pedidos/${p._id}/estado`, { estado: 'listo' }));
   const dom = await M('Usuario').findOne({ correo: 'domi@orbita.demo' }).lean();
   ok(await api('admin', 'PUT', `/pedidos/${p._id}/estado`, { estado: 'en_camino', domiciliario: dom._id }));
-  for (let i = 0; i < 40 && (await M('Empresa').findById(e._id).lean()).mensajeria.saldoWhatsapp === 10; i++) await new Promise(r => setTimeout(r, 50));
-  assert.equal((await M('Empresa').findById(e._id).lean()).mensajeria.saldoWhatsapp, 9);
+  for (let i = 0; i < 40 && !(await M('Mensaje').exists({ conversacion: id, plantilla: 'HX' + 'a'.repeat(32) })); i++) await new Promise(r => setTimeout(r, 50));
   assert.ok(await M('Mensaje').exists({ conversacion: id, plantilla: 'HX' + 'a'.repeat(32) }));
-  assert.equal(ok(await api('admin', 'GET', '/whatsapp/movimientos')).length, 2);
+  const tras = (await M('Empresa').findById(e._id).lean()).mensajeria;
+  assert.deepEqual([tras.saldoWhatsapp, tras.avisosIncluidos], [10, 1]);
+  assert.equal(ok(await api('admin', 'GET', '/whatsapp/movimientos')).length, 1, 'solo la recarga');
 
   // Otra empresa no ve nada
   no(await api('mx', 'GET', '/whatsapp/conversaciones/' + id), 403);

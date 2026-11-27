@@ -186,7 +186,7 @@ const vistaConfig = e => ({
   subcuenta: !!e.whatsapp?.subcuentaSid, servicioSid: e.whatsapp?.servicioSid || '', bienvenida: e.whatsapp?.bienvenida || '',
   notificarPedidos: e.whatsapp?.notificarPedidos !== false, plantillas: e.whatsapp?.plantillas || {},
   bot: { activo: !!e.whatsapp?.bot?.activo, instrucciones: e.whatsapp?.bot?.instrucciones || '' }, iaDisponible: ia.disponible(), modeloIA: ia.config().modelo,
-  saldoWhatsapp: e.mensajeria?.saldoWhatsapp || 0, saldoCorreo: e.mensajeria?.saldoCorreo || 0,
+  saldoWhatsapp: e.mensajeria?.saldoWhatsapp || 0, saldoCorreo: e.mensajeria?.saldoCorreo || 0, avisosIncluidos: e.mensajeria?.avisosIncluidos || 0,
   simulador: wa.twilio.simulado(), servidorListo: wa.twilio.disponible(), webhooks: wa.urls(e._id),
 });
 exports.config = manejar(async req => vistaConfig(await Empresa.findById(req.empresa._id).lean()));

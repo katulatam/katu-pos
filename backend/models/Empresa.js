@@ -68,10 +68,11 @@ const empresaSchema = new mongoose.Schema({
       entregado: { type: String, default: '' }, cancelado: { type: String, default: '' },
     },
   },
-  // Bolsa prepagada de mensajes (la recarga Katú)
+  // Bolsa prepagada de mensajes (la recarga Katú): SOLO para campañas de marketing
   mensajeria: {
     saldoWhatsapp: { type: Number, default: 0 },
     saldoCorreo:   { type: Number, default: 0 },
+    avisosIncluidos: { type: Number, default: 0 },   // avisos de pedidos con plantilla (los asume Katú)
   },
 
   pos: {

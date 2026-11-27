@@ -11,7 +11,9 @@ const Motor = require('../../../frontend/assets/js/motor');
 // ── WhatsApp del comercio: conversaciones, envíos, bolsa y avisos ──────────
 // Reglas de WhatsApp que esto respeta:
 //  - Texto libre solo dentro de las 24 h desde el último mensaje del cliente.
-//  - Fuera de esa ventana, solo plantillas aprobadas por Meta (consumen bolsa).
+//  - Fuera de esa ventana, solo plantillas aprobadas por Meta.
+// La bolsa prepagada del comercio es SOLO para marketing (campañas). Atender
+// clientes, el bot y los avisos de pedidos están incluidos en el plan.
 const VENTANA_MS = 24 * 3600 * 1000;
 const base = () => String(process.env.PUBLIC_URL || '').replace(/\/+$/, '');
 const urls = empresaId => ({ entrante: `${base()}/api/v1/whatsapp/webhook/${empresaId}`, estado: `${base()}/api/v1/whatsapp/estado/${empresaId}` });
@@ -130,11 +132,14 @@ async function enviarTexto({ empresa, conversacion, texto, usuario, autor = 'ase
   if (!ventanaAbierta(conv)) throw new ErrorApi('Pasaron más de 24 horas desde el último mensaje del cliente: WhatsApp solo permite escribirle con una plantilla aprobada', 409, 'VENTANA_CERRADA');
   return _registrar(empresa, conv, { autor, usuario, texto }, () => twilio.enviar(remitente(empresa), { a: conv.telefono, texto, aviso: urls(empresa._id).estado }));
 }
-// Plantilla aprobada (inicia el comercio): consume 1 de la bolsa
+// Plantilla aprobada (inicia el comercio). Solo las campañas de marketing consumen
+// la bolsa prepagada; los avisos de pedidos van incluidos en el plan (Katú asume
+// su costo y lo ve en mensajeria.avisosIncluidos).
 async function enviarPlantilla({ empresa, telefono, plantilla, variables, texto, tipo = 'servicio', referencia }) {
   if (!listo(empresa)) throw new ErrorApi('El WhatsApp de la empresa no está activo', 409, 'WHATSAPP_INACTIVO');
   const conv = await Conversacion.findOneAndUpdate({ empresa: empresa._id, telefono }, { $setOnInsert: { estado: 'cerrada', ultimoEn: new Date() } }, { upsert: true, new: true, setDefaultsOnInsert: true }).lean();
-  await consumir(empresa._id, { motivo: tipo === 'marketing' ? 'Campaña' : 'Aviso de pedido', referencia, permitirNegativo: tipo !== 'marketing' });
+  if (tipo === 'marketing') await consumir(empresa._id, { motivo: 'Campaña', referencia });
+  else await Empresa.updateOne({ _id: empresa._id }, { $inc: { 'mensajeria.avisosIncluidos': 1 } });
   return _registrar(empresa, conv, { autor: 'sistema', texto, plantilla }, () => twilio.enviar(remitente(empresa), { a: telefono, plantilla, variables, aviso: urls(empresa._id).estado }));
 }
 
