@@ -77,7 +77,9 @@ async function enviar({ subcuentaSid, servicioSid, numero }, { a, texto, plantil
   if (simulado()) return { sid: 'SMsim' + crypto.randomBytes(15).toString('hex'), estado: 'entregado' };
   const cred = await credSub(subcuentaSid);
   const d = await llamar(cred, 'post', `${API}/Accounts/${subcuentaSid}/Messages.json`, {
-    To: `whatsapp:${a}`, ...(servicioSid ? { MessagingServiceSid: servicioSid } : { From: `whatsapp:${numero}` }),
+    // Remitente explícito (si hay número): no depende de que el servicio elija bien del
+    // Sender Pool (evita el error 63007). El servicio sigue aplicando su configuración.
+    To: `whatsapp:${a}`, ...(servicioSid && { MessagingServiceSid: servicioSid }), ...((numero || !servicioSid) && { From: `whatsapp:${numero}` }),
     ...(plantilla ? { ContentSid: plantilla, ContentVariables: JSON.stringify(variables || {}) } : { Body: texto }),
     StatusCallback: aviso,
   });
