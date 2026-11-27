@@ -8,18 +8,32 @@
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Sora:wght@500;600;700;800&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
   <link rel="stylesheet" href="pos-admin.css">
+  <style>
+    .foto-prod { display: grid; grid-template-columns: 150px 1fr; gap: 16px; align-items: start; margin-bottom: 16px; padding-bottom: 16px; border-bottom: 1px solid var(--border); }
+    .fp-vista { width: 150px; height: 150px; border-radius: 16px; border: 2px dashed var(--border); background: #fff; display: grid; place-items: center; overflow: hidden; cursor: pointer; position: relative; }
+    .fp-vista.sobre { border-color: var(--primary-vivo); background: var(--primary-light); }
+    .fp-vista img { width: 100%; height: 100%; object-fit: contain; }
+    .fp-vista .vacio { text-align: center; color: var(--faint); font-size: 12px; padding: 10px; } .fp-vista .vacio i { font-size: 30px; display: block; margin-bottom: 6px; }
+    .fp-acc { display: flex; flex-direction: column; gap: 8px; font-size: 13px; } .fp-acc .acts { display: flex; gap: 6px; flex-wrap: wrap; }
+    .fp-acc details summary { cursor: pointer; color: var(--primary); font-weight: 600; font-size: 12.5px; } .fp-acc ul { margin: 6px 0 0; padding-left: 18px; color: var(--muted); font-size: 12.5px; line-height: 1.6; }
+    .masivo-l { max-height: 360px; overflow: auto; border: 1px solid var(--border); border-radius: 12px; }
+    .masivo-l div { display: grid; grid-template-columns: 44px 1fr auto; gap: 10px; align-items: center; padding: 8px 10px; border-bottom: 1px solid var(--border); font-size: 13px; }
+    .masivo-l img { width: 44px; height: 44px; object-fit: contain; border-radius: 8px; background: #fff; border: 1px solid var(--border); }
+    @media (max-width: 640px) { .foto-prod { grid-template-columns: 1fr; } }
+  </style>
 </head>
 <body data-pagina="productos">
 <main class="content"></main>
 <script src="../assets/js/motor.js"></script>
 <script src="pos-admin.js"></script>
+<script src="../assets/js/fotos.js"></script>
 <script>
 (async function () {
   if (!(await POS.listo)) return;
 
   const [cats, provs] = await Promise.all([datos('/categorias'), api('/proveedores').then(r => r.data || [])]);
   const edita = POS.esSuper || ['admin', 'bodega'].includes(POS.user.rol);
-  document.querySelector('main').innerHTML = `<div class="head"><div><h1>Productos</h1><p id="res"></p></div><div class="acts">${edita ? '<button class="btn" id="imp"><i class="fa-solid fa-file-import"></i> Importar</button><button class="btn" id="exp"><i class="fa-solid fa-file-excel"></i> Exportar</button><button class="btn p" id="nv"><i class="fa-solid fa-plus"></i> Nuevo producto</button>' : ''}</div></div><div class="filtros"><div class="f g"><input class="in" id="q" placeholder="Nombre, marca, código o PLU"></div><div class="f"><select class="in" id="ct"><option value="">Todas las categorías</option>${cats.map(c => `<option value="${c._id}">${esc(c.nombre)}</option>`).join('')}</select></div><div class="f"><select class="in" id="es"><option value="">Todos</option><option value="activos" selected>Activos</option><option value="inactivos">Inactivos</option></select></div></div><div class="card"><div id="t"></div><div class="pag" id="pg"></div></div>`;
+  document.querySelector('main').innerHTML = `<div class="head"><div><h1>Productos</h1><p id="res"></p></div><div class="acts">${edita ? '<button class="btn" id="fot"><i class="fa-solid fa-images"></i> Subir fotos</button><button class="btn" id="imp"><i class="fa-solid fa-file-import"></i> Importar</button><button class="btn" id="exp"><i class="fa-solid fa-file-excel"></i> Exportar</button><button class="btn p" id="nv"><i class="fa-solid fa-plus"></i> Nuevo producto</button>' : ''}</div></div><div class="filtros"><div class="f g"><input class="in" id="q" placeholder="Nombre, marca, código o PLU"></div><div class="f"><select class="in" id="ct"><option value="">Todas las categorías</option>${cats.map(c => `<option value="${c._id}">${esc(c.nombre)}</option>`).join('')}</select></div><div class="f"><select class="in" id="es"><option value="">Todos</option><option value="activos" selected>Activos</option><option value="inactivos">Inactivos</option></select></div></div><div class="card"><div id="t"></div><div class="pag" id="pg"></div></div>`;
   let pagina = 1;
   async function cargar() {
     const d = await datos(`/productos?q=${encodeURIComponent($('q').value)}&categoria=${$('ct').value}&estado=${$('es').value}&pagina=${pagina}`); if (!d) return;
@@ -27,10 +41,81 @@
     tabla($('t'), [{ t: 'Producto', f: p => `<b>${esc(p.nombre)}</b><small>${esc([p.codigo, p.plu && 'PLU ' + p.plu, p.marca].filter(Boolean).join(' · '))}</small>` }, { t: 'Categoría', f: p => p.categoria ? `<span class="bd"><i class="fa-solid ${esc(p.categoria.icono)}" style="color:${esc(p.categoria.color)}"></i> ${esc(p.categoria.nombre)}</span>` : '—' }, { t: 'Tipo', f: p => ({ unidad: 'Unidad', peso: 'Por peso', combo: 'Combo', servicio: 'Servicio' }[p.tipo]) }, { t: 'Impuesto', f: p => esc(POS.pais.impuestos.find(i => i.codigo === p.impuesto)?.nombre || POS.pais.impuestos.find(i => i.codigo === POS.pais.impuestoDefecto)?.nombre || '') }, { t: 'Costo', n: 1, f: p => dinero(p.costo) }, { t: 'Precio', n: 1, f: p => `<b>${dinero(p.precio)}</b>${p.tipo === 'peso' ? `<small>por ${p.unidad}</small>` : ''}` }, { t: 'Existencia', n: 1, f: p => p.manejaInventario ? `<span class="bd ${p.existencia <= 0 ? 'mal' : p.existencia <= p.minimo ? 'av' : 'ok'}">${fnum(p.existencia)}</span>` : '—' }, { t: '', f: p => `${p.favorito ? '<i class="fa-solid fa-star" style="color:var(--warning)" title="Rápido en caja"></i> ' : ''}${p.enLinea ? '<i class="fa-solid fa-globe" style="color:var(--primary)" title="En tienda en línea"></i> ' : ''}${p.activo ? '' : si(false)}` }], d.items, { vacio: 'No hay productos con esta búsqueda', icono: 'fa-box', clic: edita ? abrir : null });
     const ps = Math.max(1, Math.ceil(d.total / d.limite)); $('pg').innerHTML = `Página ${pagina} de ${ps} <button class="btn sm" id="a" ${pagina <= 1 ? 'disabled' : ''}>Anterior</button><button class="btn sm" id="b" ${pagina >= ps ? 'disabled' : ''}>Siguiente</button>`; $('a').onclick = () => { pagina--; cargar(); }; $('b').onclick = () => { pagina++; cargar(); };
   }
+  // ── Foto del producto: se prepara en el navegador (cuadrada, fondo blanco, liviana) ──
+  function cargadorFoto(cont, p) {
+    let pendiente = null, quitar = false;
+    const actual = p?.imagenUrl || '';
+    cont.innerHTML = `<div class="foto-prod">
+      <div class="fp-vista" id="fpv" title="Toca o arrastra una foto"></div>
+      <div class="fp-acc">
+        <b>Foto del producto</b>
+        <small style="color:var(--muted)">Se ajusta sola a un cuadrado con fondo blanco para que todo se vea parejo en el POS, la tienda y WhatsApp.</small>
+        <div class="acts"><label class="btn sm p"><i class="fa-solid fa-upload"></i> Subir foto<input type="file" accept="image/*" hidden data-f></label><label class="btn sm"><i class="fa-solid fa-camera"></i> Tomar foto<input type="file" accept="image/*" capture="environment" hidden data-f></label><button type="button" class="btn sm d" id="fpq">Quitar</button></div>
+        <div id="fpa"></div>
+        <details><summary>Recomendaciones para una buena foto</summary><ul>${Fotos.REGLAS.map(r => `<li>${esc(r)}</li>`).join('')}</ul></details>
+      </div></div>`;
+    const v = cont.querySelector('#fpv'), av = cont.querySelector('#fpa');
+    const pintar = src => { v.innerHTML = src ? `<img src="${esc(src)}" alt="">` : '<div class="vacio"><i class="fa-regular fa-image"></i>Toca o arrastra una foto</div>'; cont.querySelector('#fpq').hidden = !src; };
+    const usar = async archivo => {
+      av.innerHTML = '<small style="color:var(--muted)"><i class="fa-solid fa-spinner fa-spin"></i> Preparando la foto…</small>';
+      try {
+        pendiente = await Fotos.preparar(archivo); quitar = false; pintar(pendiente.vista);
+        av.innerHTML = pendiente.avisos.map(a => `<div class="aviso a" style="padding:8px 10px"><i class="fa-solid fa-lightbulb"></i><span>${esc(a)}</span></div>`).join('') || '<div class="aviso b" style="padding:8px 10px"><i class="fa-solid fa-circle-check"></i><span>¡Buena foto! Se guarda al tocar Guardar.</span></div>';
+      } catch (e) { av.innerHTML = `<div class="aviso m" style="padding:8px 10px"><i class="fa-solid fa-circle-xmark"></i><span>${esc(e.message)}</span></div>`; }
+    };
+    cont.querySelectorAll('[data-f]').forEach(i => { i.onchange = () => { if (i.files[0]) usar(i.files[0]); i.value = ''; }; });
+    v.onclick = () => cont.querySelector('[data-f]').click();
+    v.ondragover = e => { e.preventDefault(); v.classList.add('sobre'); };
+    v.ondragleave = () => v.classList.remove('sobre');
+    v.ondrop = e => { e.preventDefault(); v.classList.remove('sobre'); if (e.dataTransfer.files[0]) usar(e.dataTransfer.files[0]); };
+    cont.querySelector('#fpq').onclick = () => { pendiente = null; quitar = !!actual; pintar(''); av.innerHTML = ''; };
+    pintar(actual);
+    return {
+      async guardar(id) {
+        if (!id) return true;
+        if (pendiente) return !!(await Fotos.subir(id, pendiente));
+        if (quitar) return !!(await datos(`/productos/${id}/imagen`, 'DELETE'));
+        return true;
+      },
+    };
+  }
+
+  // ── Carga masiva: cada archivo se llama como el código de barras o el PLU ──
+  function fotosMasivas() {
+    const m = modal({ clase: 'l', titulo: 'Subir fotos de varios productos', html: `<p style="color:var(--muted);line-height:1.6;margin:0 0 12px">Nombra cada foto con el <b>código de barras</b> o el <b>PLU</b> del producto (por ejemplo <b>7702001023456.jpg</b> o <b>00125.png</b>). Katú las ajusta solas a cuadrado con fondo blanco y las asocia a su producto.</p>
+      <label class="btn p"><i class="fa-solid fa-images"></i> Elegir fotos<input type="file" accept="image/*" multiple hidden id="mf"></label>
+      <div class="masivo-l" id="ml" style="margin-top:12px" hidden></div><div id="mr" style="margin-top:10px"></div>`, pie: '<button class="btn" data-x>Cerrar</button><button class="btn p" data-s disabled><i class="fa-solid fa-upload"></i> Subir fotos</button>' });
+    let filas = [];
+    m.q('#mf').onchange = async () => {
+      const archivos = [...m.q('#mf').files].slice(0, 300); if (!archivos.length) return;
+      const codigos = archivos.map(a => a.name.replace(/\.[^.]+$/, '').trim());
+      const mapa = await datos('/productos/codigos', 'POST', { codigos }) || {};
+      filas = archivos.map((a, i) => ({ archivo: a, codigo: codigos[i], prod: mapa[codigos[i]] || null, estado: mapa[codigos[i]] ? 'listo' : 'sin' }));
+      const pintar = () => {
+        m.q('#ml').hidden = false;
+        m.q('#ml').innerHTML = filas.map(x => `<div><img src="${x.vista || ''}" alt="" ${x.vista ? '' : 'style="visibility:hidden"'}><span><b>${esc(x.prod?.nombre || x.archivo.name)}</b><small style="display:block;color:var(--muted)">${esc(x.codigo)}${x.prod?.tieneImagen ? ' · reemplaza la foto actual' : ''}${x.error ? ' · ' + esc(x.error) : ''}</small></span>${{ listo: '<span class="bd az">Lista</span>', sin: '<span class="bd mal">Sin producto con ese código</span>', subiendo: '<span class="bd vi">Subiendo…</span>', ok: '<span class="bd ok">Subida</span>', error: '<span class="bd mal">Error</span>' }[x.estado]}</div>`).join('');
+        const n = filas.filter(x => x.estado === 'listo').length;
+        m.q('[data-s]').disabled = !n; m.q('#mr').innerHTML = `<small style="color:var(--muted)">${n} de ${filas.length} fotos coinciden con un producto.</small>`;
+      };
+      m.pintar = pintar; pintar();
+    };
+    m.q('[data-s]').onclick = async () => {
+      m.q('[data-s]').disabled = true;
+      for (const x of filas.filter(f => f.estado === 'listo')) {
+        x.estado = 'subiendo'; m.pintar();
+        try { const f = await Fotos.preparar(x.archivo); x.vista = f.vista; x.estado = (await Fotos.subir(x.prod._id, f)) ? 'ok' : 'error'; }
+        catch (e) { x.estado = 'error'; x.error = e.message; }
+        m.pintar();
+      }
+      toast(`${filas.filter(x => x.estado === 'ok').length} fotos subidas`); cargar();
+    };
+  }
+
   function abrir(p) {
-    const m = modal({ clase: 'l', titulo: p ? 'Editar producto' : 'Nuevo producto', html: '<div id="f"></div><div id="px"></div><div id="cx"></div>', pie: `${p && (POS.esSuper || POS.user.rol === 'admin') ? '<button class="btn d" data-b style="margin-right:auto">Eliminar</button>' : ''}<button class="btn p" data-s>Guardar</button>` });
-    const f = formulario(m.q('#f'), [{ k: 'nombre', l: 'Nombre', w: 8, req: 1 }, { k: 'tipo', l: 'Se vende', t: 'lista', w: 4, op: [['unidad', 'Por unidad'], ['peso', 'Por peso (báscula)'], ['combo', 'Combo'], ['servicio', 'Servicio']] }, { k: 'codigo', l: 'Código de barras', w: 4, ayuda: 'Escanéalo con el cursor aquí' }, { k: 'plu', l: 'PLU (máx. 5 dígitos)', w: 4, ayuda: 'Para balanza etiquetadora y teclado' }, { k: 'categoria', l: 'Categoría', t: 'lista', w: 4, vacio: 'Sin categoría', op: cats.map(c => [c._id, c.nombre]) }, { k: 'precio', l: 'Precio con impuesto', t: 'dinero', w: 4, req: 1 }, { k: 'costo', l: 'Costo', t: 'dinero', w: 4, ayuda: 'Se promedia solo con cada compra' }, { k: 'impuesto', l: 'Impuesto', t: 'lista', w: 4, op: POS.pais.impuestos.map(i => [i.codigo, i.nombre]), def: POS.pais.impuestoDefecto }, { k: 'marca', l: 'Marca', w: 4 }, { k: 'unidad', l: 'Unidad de medida', t: 'lista', w: 4, op: [['und', 'Unidad'], ['kg', 'Kilogramo'], ['lt', 'Litro'], ['m', 'Metro']] }, { k: 'proveedor', l: 'Proveedor', t: 'lista', w: 4, vacio: 'Sin proveedor', op: provs.map(x => [x._id, x.nombre]) }, { k: 'minimo', l: 'Existencia mínima', t: 'numero', w: 4 }, { k: 'imagenUrl', l: 'Imagen (https)', w: 8 }, { k: 'descripcion', l: 'Descripción para la tienda en línea', t: 'area' }, { k: 'manejaInventario', l: 'Controlar inventario', t: 'si', w: 4, def: true, si: o => !['combo', 'servicio'].includes(o.tipo) }, { k: 'manejaVencimiento', l: 'Maneja vencimiento', t: 'si', w: 4, si: o => !['combo', 'servicio'].includes(o.tipo) }, { k: 'favorito', l: 'Tecla rápida en caja', t: 'si', w: 4 }, { k: 'enLinea', l: 'Vender en línea', t: 'si', w: 4, def: true }, { k: 'activo', l: 'Activo', t: 'si', w: 4, def: true }], p || {});
+    const m = modal({ clase: 'l', titulo: p ? 'Editar producto' : 'Nuevo producto', html: '<div id="foto"></div><div id="f"></div><div id="px"></div><div id="cx"></div>', pie: `${p && (POS.esSuper || POS.user.rol === 'admin') ? '<button class="btn d" data-b style="margin-right:auto">Eliminar</button>' : ''}<button class="btn p" data-s>Guardar</button>` });
+    const f = formulario(m.q('#f'), [{ k: 'nombre', l: 'Nombre', w: 8, req: 1 }, { k: 'tipo', l: 'Se vende', t: 'lista', w: 4, op: [['unidad', 'Por unidad'], ['peso', 'Por peso (báscula)'], ['combo', 'Combo'], ['servicio', 'Servicio']] }, { k: 'codigo', l: 'Código de barras', w: 4, ayuda: 'Escanéalo con el cursor aquí' }, { k: 'plu', l: 'PLU (máx. 5 dígitos)', w: 4, ayuda: 'Para balanza etiquetadora y teclado' }, { k: 'categoria', l: 'Categoría', t: 'lista', w: 4, vacio: 'Sin categoría', op: cats.map(c => [c._id, c.nombre]) }, { k: 'precio', l: 'Precio con impuesto', t: 'dinero', w: 4, req: 1 }, { k: 'costo', l: 'Costo', t: 'dinero', w: 4, ayuda: 'Se promedia solo con cada compra' }, { k: 'impuesto', l: 'Impuesto', t: 'lista', w: 4, op: POS.pais.impuestos.map(i => [i.codigo, i.nombre]), def: POS.pais.impuestoDefecto }, { k: 'marca', l: 'Marca', w: 4 }, { k: 'unidad', l: 'Unidad de medida', t: 'lista', w: 4, op: [['und', 'Unidad'], ['kg', 'Kilogramo'], ['lt', 'Litro'], ['m', 'Metro']] }, { k: 'proveedor', l: 'Proveedor', t: 'lista', w: 4, vacio: 'Sin proveedor', op: provs.map(x => [x._id, x.nombre]) }, { k: 'minimo', l: 'Existencia mínima', t: 'numero', w: 4 }, { k: 'descripcion', l: 'Descripción para la tienda en línea', t: 'area' }, { k: 'manejaInventario', l: 'Controlar inventario', t: 'si', w: 4, def: true, si: o => !['combo', 'servicio'].includes(o.tipo) }, { k: 'manejaVencimiento', l: 'Maneja vencimiento', t: 'si', w: 4, si: o => !['combo', 'servicio'].includes(o.tipo) }, { k: 'favorito', l: 'Tecla rápida en caja', t: 'si', w: 4 }, { k: 'enLinea', l: 'Vender en línea', t: 'si', w: 4, def: true }, { k: 'activo', l: 'Activo', t: 'si', w: 4, def: true }], p || {});
     let pres = (p?.presentaciones || []).map(x => ({ ...x })), comp = [];
+    const foto = cargadorFoto(m.q('#foto'), p);
     const px = m.q('#px'), cx = m.q('#cx');
     const pintarP = () => { px.innerHTML = `<div class="sec" style="margin:18px 0 12px;padding-top:14px">Presentaciones con código propio (six-pack, caja…)</div>${pres.map((x, i) => `<div class="lin" style="grid-template-columns:1.4fr 1.4fr .8fr 1fr auto"><input class="in" placeholder="Nombre" data-i="${i}" data-k="nombre" value="${esc(x.nombre)}"><input class="in" placeholder="Código" data-i="${i}" data-k="codigo" value="${esc(x.codigo || '')}"><input class="in" type="number" step="any" placeholder="Unidades" data-i="${i}" data-k="factor" value="${x.factor || ''}"><input class="in" type="number" step="any" placeholder="Precio" data-i="${i}" data-k="precio" value="${x.precio ?? ''}"><button class="ib d" data-q="${i}" type="button"><i class="fa-solid fa-trash"></i></button></div>`).join('')}<button class="btn sm" type="button" data-n><i class="fa-solid fa-plus"></i> Agregar presentación</button>`; px.hidden = f.tomar().tipo !== 'unidad'; };
     const pintarC = () => { cx.innerHTML = `<div class="sec" style="margin:18px 0 12px;padding-top:14px">Componentes del combo</div>${comp.map((x, i) => `<div class="lin" style="grid-template-columns:2fr .7fr auto"><input class="in" disabled value="${esc(x.nombre || x.producto)}"><input class="in" type="number" step="any" data-ci="${i}" value="${x.cantidad}"><button class="ib d" data-cq="${i}" type="button"><i class="fa-solid fa-trash"></i></button></div>`).join('')}<input class="in" id="cb" placeholder="Buscar producto para agregar">`; buscarProducto(cx.querySelector('#cb'), x => { comp.push({ producto: x._id, nombre: x.nombre, cantidad: 1 }); pintarC(); }); cx.hidden = f.tomar().tipo !== 'combo'; };
@@ -41,10 +126,10 @@
     f.campo('tipo').addEventListener('change', () => { pintarP(); pintarC(); }); pintarP(); pintarC();
     if (p?.componentes?.length) (async () => { const d = await datos('/productos?limite=2000'); comp = p.componentes.map(c => ({ ...c, nombre: d?.items.find(x => x._id === c.producto)?.nombre })); pintarC(); })();
     m.q('[data-b]')?.addEventListener('click', async () => { if (await confirmar('Eliminar producto', 'Solo se puede si nunca se ha vendido.') && await datos('/productos/' + p._id, 'DELETE')) { m.cerrar(); cargar(); } });
-    m.q('[data-s]').onclick = async () => { const o = f.validar(); if (!o) return; if (!(o.precio > 0) && !await confirmar('Precio en cero', '¿Guardar el producto sin precio?', 'Guardar')) return; const r = await datos('/productos' + (p ? '/' + p._id : ''), p ? 'PUT' : 'POST', { ...o, presentaciones: o.tipo === 'unidad' ? pres.map(x => ({ ...x, factor: Number(x.factor), precio: Number(x.precio) })) : [], componentes: o.tipo === 'combo' ? comp.map(c => ({ producto: c.producto, cantidad: c.cantidad })) : [] }); if (r) { m.cerrar(); toast('Guardado'); cargar(); } };
+    m.q('[data-s]').onclick = async () => { const o = f.validar(); if (!o) return; if (!(o.precio > 0) && !await confirmar('Precio en cero', '¿Guardar el producto sin precio?', 'Guardar')) return; const r = await datos('/productos' + (p ? '/' + p._id : ''), p ? 'PUT' : 'POST', { ...o, presentaciones: o.tipo === 'unidad' ? pres.map(x => ({ ...x, factor: Number(x.factor), precio: Number(x.precio) })) : [], componentes: o.tipo === 'combo' ? comp.map(c => ({ producto: c.producto, cantidad: c.cantidad })) : [] }); if (r) { const okFoto = await foto.guardar(r._id || p?._id); m.cerrar(); toast(okFoto ? 'Guardado' : 'Producto guardado, pero la foto no se pudo subir', okFoto ? 'bien' : 'mal'); cargar(); } };
   }
   if (edita) {
-    $('nv').onclick = () => abrir(null); $('exp').onclick = () => descargar('/productos/exportar', 'productos.xlsx');
+    $('nv').onclick = () => abrir(null); $('fot').onclick = fotosMasivas; $('exp').onclick = () => descargar('/productos/exportar', 'productos.xlsx');
     $('imp').onclick = () => { const m = modal({ clase: 's', titulo: 'Importar productos', html: `<p style="color:var(--muted);line-height:1.6;margin-bottom:14px">Usa el mismo formato del Excel exportado: Codigo, PLU, Nombre, Categoria, Marca, Tipo, Precio, Costo, Impuesto, Minimo. Si el código ya existe, se actualiza.</p><input type="file" class="in" accept=".xlsx,.xls,.csv" style="padding:8px"><div id="r" style="margin-top:14px"></div>`, pie: '<button class="btn p" data-s>Importar</button>' }); m.q('[data-s]').onclick = async e => { const a = m.q('input').files[0]; if (!a) return toast('Elige el archivo', 'mal'); const fd = new FormData(); fd.append('archivo', a); e.target.disabled = true; const r = await datos('/productos/importar', 'POST', fd); e.target.disabled = false; if (!r) return; m.q('#r').innerHTML = `<div class="aviso b">${r.creados} creados · ${r.actualizados} actualizados</div>${r.errores.length ? `<div class="aviso m" style="margin-top:8px;display:block">${r.errores.slice(0, 12).map(x => `Fila ${x.fila}: ${esc(x.error)}`).join('<br>')}</div>` : ''}`; cargar(); }; };
   }
   ['ct', 'es'].forEach(i => { $(i).onchange = () => { pagina = 1; cargar(); }; }); let t; $('q').oninput = () => { clearTimeout(t); t = setTimeout(() => { pagina = 1; cargar(); }, 250); };

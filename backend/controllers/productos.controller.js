@@ -62,6 +62,29 @@ exports.exportar = manejar(async (req, res) => {
   res.type('xlsx').send(XLSX.write(wb, { type: 'buffer', bookType: 'xlsx' }));
 });
 // Importar de Excel: crea o actualiza por código de barras (o PLU)
+// ── Fotos ──────────────────────────────────────────────────────────────────
+// El panel prepara la foto (800×800 JPG + miniatura 320) y la sube aquí
+const imagenes = require('../utils/imagenes');
+const productoDe = async req => {
+  const p = /^[a-f\d]{24}$/i.test(String(req.params.id)) ? await Producto.findOne({ _id: req.params.id, empresa: req.empresa._id }).select('_id empresa').lean() : null;
+  if (!p) throw new ErrorApi('Producto no encontrado', 404);
+  return p;
+};
+exports.subirImagen = manejar(async req => imagenes.asignar(await productoDe(req), req.files?.imagen?.[0]?.buffer, req.files?.mini?.[0]?.buffer));
+exports.quitarImagen = manejar(async req => { await imagenes.quitar(await productoDe(req)); return { ok: true }; });
+// Carga masiva: cada archivo se llama como el código de barras o el PLU del producto
+exports.porCodigos = manejar(async req => {
+  const cods = [...new Set((Array.isArray(req.body.codigos) ? req.body.codigos : []).map(c => String(c).trim()).filter(Boolean))].slice(0, 500);
+  const plus = cods.filter(c => /^\d{1,5}$/.test(c)).map(c => c.padStart(5, '0'));
+  const ps = await Producto.find({ empresa: req.empresa._id, $or: [{ codigos: { $in: cods } }, { codigo: { $in: cods } }, { plu: { $in: plus } }] }).select('nombre codigo codigos plu imagenUrl').lean();
+  const r = {};
+  for (const c of cods) {
+    const p = ps.find(x => x.codigo === c || (x.codigos || []).includes(c) || (/^\d{1,5}$/.test(c) && x.plu === c.padStart(5, '0')));
+    if (p) r[c] = { _id: p._id, nombre: p.nombre, tieneImagen: !!p.imagenUrl };
+  }
+  return r;
+});
+
 exports.importar = manejar(async req => {
   if (!req.file) throw new ErrorApi('Adjunta el archivo de Excel');
   const wb = XLSX.read(req.file.buffer, { type: 'buffer' });

@@ -19,6 +19,8 @@ const productoSchema = new mongoose.Schema({
   presentaciones: [{ nombre: String, codigo: String, factor: { type: Number, default: 1 }, precio: Number }], // six-pack, caja…
   componentes: [{ _id: false, producto: { type: mongoose.Schema.Types.ObjectId, ref: 'Producto' }, cantidad: Number }],
   imagenUrl:   { type: String, default: '' },
+  imagenMini:  { type: String, default: '' },                     // miniatura (botones de la caja)
+  imagenArchivos: { type: [mongoose.Schema.Types.ObjectId], select: false }, // fotos subidas (GridFS) para borrarlas al cambiar
   manejaInventario: { type: Boolean, default: true },
   manejaVencimiento: { type: Boolean, default: false },
   minimo:      { type: Number, default: 0 },

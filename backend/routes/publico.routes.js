@@ -70,6 +70,14 @@ r.post('/seguimiento/:token/calificar', limitar({ max: 10 }), manejar(async req 
   return { gracias: true };
 }));
 
+// Fotos de productos subidas desde el panel (el id cambia con cada foto: caché larga)
+r.get('/img/:archivo', limitar({ max: 3000 }), async (req, res) => {
+  const m = String(req.params.archivo).match(/^([a-f\d]{24})\.jpg$/i);
+  const img = m ? await require('../utils/imagenes').leer(m[1]).catch(() => null) : null;
+  if (!img) return res.status(404).json({ success: false, error: 'Imagen no encontrada' });
+  res.set({ 'Content-Type': img.tipo, 'Cache-Control': 'public, max-age=31536000, immutable' }).send(img.datos);
+});
+
 // Imagen de la promoción del día (la descarga WhatsApp al enviar la plantilla con imagen)
 r.get('/promo-img/:clave', limitar({ max: 3000 }), async (req, res) => {
   const img = await require('../utils/imagenPromo').obtener(req.params.clave);

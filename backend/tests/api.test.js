@@ -870,3 +870,36 @@ test('números de WhatsApp de Katú: comprar, asignar (solo Pro/Premium), activa
   assert.deepEqual([c.suscripcion.estado, c.suscripcion.cortesia, c.suscripcion.pruebaHasta, c.estado], ['activa', true, undefined, true]);
   assert.equal(require('../utils/prueba').enPrueba(c), false);
 });
+
+test('fotos de productos: se suben preparadas (JPG cuadrado + miniatura), se sirven con caché y se reemplazan', async () => {
+  const e = await M('Empresa').findOne({ slug: 'orbita' }).lean();
+  const p = await M('Producto').findOne({ empresa: e._id, activo: true, codigo: { $nin: [null, ''] } }).lean();
+  // JPG mínimo con las medidas en su marcador SOF0 (el servidor no decodifica la imagen)
+  const jpg = (w, h, relleno = 2000) => Buffer.concat([Buffer.from([0xFF, 0xD8, 0xFF, 0xE0, 0x00, 0x10, 0x4A, 0x46, 0x49, 0x46, 0x00, 0x01, 0x01, 0x00, 0x00, 0x01, 0x00, 0x01, 0x00, 0x00]), Buffer.from([0xFF, 0xC0, 0x00, 0x11, 0x08, h >> 8, h & 255, w >> 8, w & 255, 0x03, 0x01, 0x22, 0x00, 0x02, 0x11, 0x01, 0x03, 0x11, 0x01]), Buffer.alloc(relleno, 0x11), Buffer.from([0xFF, 0xD9])]);
+  const subir = (quien, grande, mini) => { const fd = new FormData(); fd.append('imagen', new Blob([grande], { type: 'image/jpeg' }), 'foto.jpg'); fd.append('mini', new Blob([mini], { type: 'image/jpeg' }), 'mini.jpg'); return fetch(`${base}/productos/${p._id}/imagen`, { method: 'POST', headers: { Authorization: 'Bearer ' + tk[quien] }, body: fd }).then(async r => ({ s: r.status, ...(await r.json()) })); };
+  const ids = u => u.match(/img\/([a-f\d]{24})\.jpg$/)[1];
+
+  assert.equal((await subir('caja', jpg(800, 800), jpg(320, 320))).s, 403);
+  assert.equal((await subir('admin', jpg(800, 600), jpg(320, 320))).s, 400, 'debe ser cuadrada');
+  assert.equal((await subir('admin', Buffer.from('\x89PNG falso'), jpg(320, 320))).s, 400, 'debe ser JPG');
+  const r1 = ok(await subir('admin', jpg(800, 800), jpg(320, 320)));
+  assert.match(r1.imagenUrl, /\/api\/v1\/publico\/img\/[a-f\d]{24}\.jpg$/);
+  const img = await fetch(`${base}/publico/img/${ids(r1.imagenUrl)}.jpg`);
+  assert.deepEqual([img.status, img.headers.get('content-type'), /immutable/.test(img.headers.get('cache-control'))], [200, 'image/jpeg', true]);
+  assert.equal((await M('Producto').findById(p._id).lean()).imagenMini, r1.imagenMini);
+
+  // Reemplazar borra la anterior; la promo de WhatsApp la lee directo
+  const r2 = ok(await subir('admin', jpg(1000, 1000), jpg(320, 320)));
+  assert.equal((await fetch(`${base}/publico/img/${ids(r1.imagenUrl)}.jpg`)).status, 404);
+  const promo = await require('../utils/imagenPromo').obtener(`${e._id}-${p._id}`);
+  assert.equal(promo.tipo, 'image/jpeg');
+
+  // Carga masiva: el nombre del archivo es el código de barras
+  const mapa = ok(await api('admin', 'POST', '/productos/codigos', { codigos: [p.codigo, 'no-existe'] }));
+  assert.deepEqual([String(mapa[p.codigo]._id), mapa[p.codigo].tieneImagen, mapa['no-existe']], [String(p._id), true, undefined]);
+
+  // Quitar
+  ok(await api('admin', 'DELETE', `/productos/${p._id}/imagen`));
+  assert.equal((await M('Producto').findById(p._id).lean()).imagenUrl, '');
+  assert.equal((await fetch(`${base}/publico/img/${ids(r2.imagenUrl)}.jpg`)).status, 404);
+});

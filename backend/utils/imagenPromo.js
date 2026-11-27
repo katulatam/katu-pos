@@ -46,7 +46,9 @@ async function obtener(c) {
   let img;
   try {
     const p = await require('../models/Producto').findOne({ _id: m[2], empresa: m[1] }).select('imagenUrl').lean();
-    img = p?.imagenUrl ? await descargarSegura(p.imagenUrl) : respaldo();
+    // Foto subida desde el panel: se lee directo de la base de datos (ya es JPG)
+    const propia = require('./imagenes').idDeUrl(p?.imagenUrl);
+    img = propia ? (await require('./imagenes').leer(propia)) || respaldo() : p?.imagenUrl ? await descargarSegura(p.imagenUrl) : respaldo();
   } catch { img = respaldo(); }
   if (cache.size > 300) cache.delete(cache.keys().next().value);
   cache.set(m[0], { img, hasta: Date.now() + 30 * 60000 });
