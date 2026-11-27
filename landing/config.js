@@ -4,5 +4,5 @@ window.KATU = {
   API: 'https://app.katupos.com/api/v1',
   DOMINIO: 'katupos.com',
   CONTACTO: 'hola@katupos.com',
-  WHATSAPP: '', // ej. 573001234567 para el botón de contacto (vacío = oculto)
+  WHATSAPP: '573052853363', // ej. 573001234567 para el botón de contacto (vacío = oculto)
 };

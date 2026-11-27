@@ -17,6 +17,7 @@ Sitio estático (HTML, CSS y JS, sin compilación). Se sube tal cual al balancea
 - **Kioscos de autopago**: la landing aclara que son equipos que se compran aparte; los botones "Solicitar cotización" abren WhatsApp (`WHATSAPP` en `config.js`) o, si está vacío, un correo a `CONTACTO`.
 - **Registro**: valida el subdominio en vivo, crea el registro y redirige al Checkout de Stripe.
 - **Enlace directo a un plan**: `https://www.katupos.com/#plan-pro` abre el registro con ese plan.
+- **Al publicar cambios** de `estilos.css`, `app.js` o `config.js`, sube el número `?v=` en `index.html` y `bienvenida.html`: así los navegadores no usan la versión vieja guardada en caché.
 - **Revisar textos antes de publicar**: las promesas comerciales (por ejemplo "soporte prioritario", "factura incluida en todos los planes", "copias de seguridad diarias") deben coincidir con lo que Katú ofrece.
 
 Para verla en local: sirve la carpeta con cualquier servidor estático y cambia `API` en `config.js` a `http://localhost:3008/api/v1`.
