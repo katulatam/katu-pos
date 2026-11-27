@@ -11,7 +11,7 @@
   document.documentElement.dataset.tema = localStorage.getItem('katu_admin_tema') || 'claro';
 
   const MENU = [
-    ['General', [['dashboard', 'Inicio', 'fa-chart-line', 'admin,supervisor'], ['ventas', 'Ventas', 'fa-receipt', 'admin,supervisor'], ['turnos', 'Turnos y arqueos', 'fa-cash-register', 'admin,supervisor'], ['reportes', 'Informes', 'fa-chart-column', 'admin,supervisor']]],
+    ['General', [['dashboard', 'Inicio', 'fa-chart-line', 'admin,supervisor'], ['ventas', 'Ventas', 'fa-receipt', 'admin,supervisor'], ['turnos', 'Turnos y arqueos', 'fa-cash-register', 'admin,supervisor'], ['reportes', 'Informes', 'fa-chart-column', 'admin,supervisor'], ['informes-ia', 'Informes con IA', 'fa-wand-magic-sparkles', 'admin,supervisor']]],
     ['Domicilios', [['whatsapp', 'WhatsApp', 'fa-comments', 'admin,supervisor,asesor', 'whatsapp'], ['pedidos', 'Tablero de pedidos', 'fa-motorcycle', 'admin,supervisor,bodega', 'domicilios'], ['zonas', 'Zonas de cobertura', 'fa-draw-polygon', 'admin', 'domicilios']]],
     ['Catálogo', [['productos', 'Productos', 'fa-box', 'admin,bodega,supervisor'], ['categorias', 'Categorías', 'fa-layer-group', 'admin,bodega'], ['promociones', 'Promociones', 'fa-tags', 'admin']]],
     ['Inventario', [['inventario', 'Existencias', 'fa-warehouse', 'admin,bodega,supervisor'], ['compras', 'Compras', 'fa-truck-ramp-box', 'admin,bodega'], ['reabastecer', 'Reabastecer', 'fa-wand-magic-sparkles', 'admin,bodega,supervisor'], ['vencimientos', 'Vencimientos', 'fa-hourglass-half', 'admin,bodega,supervisor'], ['proveedores', 'Proveedores', 'fa-handshake-angle', 'admin,bodega']]],

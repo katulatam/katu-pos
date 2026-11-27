@@ -78,6 +78,11 @@ const empresaSchema = new mongoose.Schema({
     saldoCorreo:   { type: Number, default: 0 },
     avisosIncluidos: { type: Number, default: 0 },   // avisos de pedidos con plantilla (los asume Katú)
   },
+  // Informes con IA: correo semanal con el resumen (lunes 7 a. m. hora del negocio)
+  informes: {
+    semanal: { type: Boolean, default: true },
+    ultimoSemanal: Date,
+  },
   // Marketing: cuidar al cliente (y la calidad del número ante Meta)
   marketing: {
     limiteSemanal: { type: Number, default: 2, min: 0, max: 14 },  // mensajes de marketing por cliente y canal en 7 días (0 = sin límite)

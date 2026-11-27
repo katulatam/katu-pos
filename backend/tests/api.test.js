@@ -903,3 +903,55 @@ test('fotos de productos: se suben preparadas (JPG cuadrado + miniatura), se sir
   assert.equal((await M('Producto').findById(p._id).lean()).imagenUrl, '');
   assert.equal((await fetch(`${base}/publico/img/${ids(r2.imagenUrl)}.jpg`)).status, 404);
 });
+
+test('informes con IA: datos exactos del sistema, IA que interpreta, privacidad, caché, límite y correo semanal', async () => {
+  const e = await M('Empresa').findOne({ slug: 'orbita' }).lean();
+  assert.equal(no(await api('admin', 'POST', '/reportes/ia', { tipo: 'resumen' }), 503).success, false);
+  const llamadas = [];
+  const ia = http.createServer((req, res) => {
+    let b = ''; req.on('data', c => { b += c; }).on('end', () => {
+      llamadas.push(JSON.parse(b));
+      res.setHeader('Content-Type', 'application/json');
+      res.end(JSON.stringify({ choices: [{ message: { content: 'Aquí va: ' + JSON.stringify({ titular: 'C1 lideró la semana', resumen: 'Vendiste bien.', hallazgos: [{ titulo: 'C1 vende más', detalle: 'Mantén el ritmo', tipo: 'positivo' }, { titulo: 'x', detalle: 'y', tipo: 'raro' }], acciones: [{ titulo: 'Pedir leche', detalle: 'Se agota en 2 días', prioridad: 'alta' }] }) } }], usage: { total_tokens: 900 } }));
+    });
+  });
+  await new Promise(r => ia.listen(0, r));
+  Object.assign(process.env, { OPENROUTER_URL: `http://127.0.0.1:${ia.address().port}`, OPENROUTER_API_KEY: 'prueba' });
+  try {
+    const D = ok(await api('admin', 'GET', '/reportes/ia'));
+    assert.ok(D.disponible && D.tipos.length === 7);
+    no(await api('caja', 'POST', '/reportes/ia', { tipo: 'resumen' }), 403);
+    for (const tipo of ['resumen', 'inventario', 'rentabilidad', 'vencimientos', 'clientes', 'equipo']) {
+      const r = ok(await api('admin', 'POST', '/reportes/ia', { tipo, periodo: '30d' }));
+      assert.ok(r.analisis.titular && r.datos, tipo);
+    }
+    // El análisis se limpia y los alias de cajeros vuelven a su nombre
+    const eq = await M('InformeIA').findOne({ empresa: e._id, tipo: 'equipo' }).lean();
+    assert.ok(!/\bC1\b/.test(eq.analisis.titular) || !eq.tablas.cajeros.length, 'alias reemplazado');
+    assert.equal(eq.analisis.hallazgos[1].tipo, 'info');
+    // A la IA no le llegan nombres ni teléfonos de clientes
+    const cli = llamadas.find(x => /Informe: Clientes/.test(x.messages[1].content)).messages[1].content;
+    const algunos = await M('Cliente').find({ empresa: e._id }).limit(5).lean();
+    for (const c of algunos) { assert.ok(!cli.includes(c.nombre), 'sin nombres'); if (c.telefono) assert.ok(!cli.includes(c.telefono), 'sin teléfonos'); }
+    assert.match(llamadas[0].messages[0].content, /No inventes cifras/);
+    // Caché, regenerar y preguntas
+    const n = llamadas.length;
+    assert.equal(ok(await api('admin', 'POST', '/reportes/ia', { tipo: 'resumen', periodo: '30d' })).cache, true);
+    assert.equal(llamadas.length, n);
+    ok(await api('admin', 'POST', '/reportes/ia', { tipo: 'resumen', periodo: '30d', regenerar: true }));
+    no(await api('admin', 'POST', '/reportes/ia', { tipo: 'pregunta', pregunta: '¿?' }), 400);
+    const p = ok(await api('admin', 'POST', '/reportes/ia', { tipo: 'pregunta', pregunta: '¿Qué debería poner en promoción?' }));
+    assert.ok(p.datos.resumen && p.datos.inventario);
+    no(await api('mx', 'GET', `/reportes/ia/${p._id}`), 404);
+    assert.equal(ok(await api('admin', 'GET', `/reportes/ia/${p._id}`)).pregunta, '¿Qué debería poner en promoción?');
+    // Correo semanal: lunes 7 a. m. de Bogotá, una sola vez
+    const inf = require('../utils/informesIA');
+    const lunes = new Date('2026-11-30T12:30:00Z');
+    assert.ok(await inf.semanal(lunes) >= 1);
+    assert.ok((await M('Empresa').findById(e._id).lean()).informes.ultimoSemanal);
+    assert.equal(await inf.semanal(lunes), 0);
+    assert.equal(await inf.semanal(new Date('2026-12-01T12:30:00Z')), 0, 'martes no');
+    ok(await api('admin', 'PUT', '/reportes/ia/config', { semanal: false }));
+    assert.equal((await M('Empresa').findById(e._id).lean()).informes.semanal, false);
+  } finally { ia.close(); delete process.env.OPENROUTER_URL; delete process.env.OPENROUTER_API_KEY; }
+});
