@@ -191,6 +191,8 @@ async function provisionar(registroId, { cliente, suscripcion } = {}) {
     const token = await empresas.enlaceClave(usuario._id);
     await Registro.updateOne({ _id: reg._id }, { estado: 'listo', empresa: empresa._id, subdominio: slug, error: '' });
     await correoBienvenida(reg, empresa, usuario, token);
+    // Pro y Premium incluyen el número de WhatsApp: se asigna solo (la prueba gratis no lo recibe)
+    if (!esPrueba) await require('./whatsapp/numeros').asignarAlSuscribirse(empresa._id);
     return { ...reg, estado: 'listo', empresa: empresa._id, subdominio: slug };
   } catch (e) {
     console.error('[suscripcion.provisionar]', reg._id, e.message);
@@ -233,6 +235,7 @@ async function activarEmpresa(empresaId, { plan: codigo, periodo, cliente, suscr
     $unset: { 'suscripcion.pruebaHasta': 1, 'suscripcion.avisosPrueba': 1, 'suscripcion.moraDesde': 1 },
   });
   console.log(`[suscripcion] ${e.slug} se suscribió al plan ${plan.codigo} (${periodo})`);
+  await require('./whatsapp/numeros').asignarAlSuscribirse(e._id);
   return Empresa.findById(e._id).lean();
 }
 const activarDesdeSesion = (s, empresaId = s.metadata?.empresa) => activarEmpresa(empresaId, { plan: s.metadata?.plan, periodo: s.metadata?.periodo, cliente: s.customer, suscripcion: s.subscription });

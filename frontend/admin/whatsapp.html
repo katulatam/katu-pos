@@ -63,7 +63,7 @@
   const yo = POS.user._id || POS.user.id;
 
   main.innerHTML = `<div class="head"><div><h1>WhatsApp</h1><p id="sub"></p></div><div class="acts" id="acts"></div></div>
-    ${R.listo ? '' : `<div class="aviso m"><i class="fa-solid fa-triangle-exclamation"></i> El WhatsApp de la empresa aún no está activo. ${POS.esSuper ? 'Configúralo en <a href="whatsapp-config.html">WhatsApp y mensajes</a>.' : 'Pide al equipo de Katú que lo configure.'}</div>`}
+    ${R.listo ? '' : R.chatPrueba ? `<div class="aviso i"><i class="fa-solid fa-flask"></i><div><b>Aún no tienes número de WhatsApp.</b> Mientras tanto, toca <b>Probar el asistente</b> y escríbele como si fueras tu cliente: verás cómo responde con tu catálogo, arma el pedido y cómo un asesor toma la conversación. Nada sale por WhatsApp. Con los planes Pro y Premium te asignamos tu número listo, sin que hagas nada.</div></div>` : `<div class="aviso m"><i class="fa-solid fa-triangle-exclamation"></i> El WhatsApp de la empresa aún no está activo. ${POS.esSuper ? 'Configúralo en <a href="whatsapp-config.html">WhatsApp y mensajes</a>.' : 'Pide al equipo de Katú que lo configure.'}</div>`}
     <div class="wa">
       <section class="card"><div class="wa-tabs" id="tabs"></div><div style="padding:10px;border-bottom:1px solid var(--border)"><input class="in" id="q" placeholder="Buscar nombre o celular"></div><div class="wa-lista" id="lista"></div></section>
       <section class="card wa-chat" id="chat"><div class="nada" style="margin:auto"><i class="fa-brands fa-whatsapp"></i>Elige una conversación</div></section>
@@ -71,7 +71,7 @@
     </div>`;
   const pintarCab = () => {
     $('sub').textContent = `${R.numero ? R.numero + ' · ' : ''}${R.enEspera} en espera · ${R.mias} atendiendo${R.bot ? ` · ${R.conBot} con el bot` : ''}${R.simulador ? ' · modo simulador' : ''}`;
-    $('acts').innerHTML = R.simulador ? '<button class="btn" id="sim"><i class="fa-solid fa-flask"></i> Simular cliente</button>' : '';
+    $('acts').innerHTML = R.simulador ? '<button class="btn" id="sim"><i class="fa-solid fa-flask"></i> Simular cliente</button>' : R.chatPrueba ? '<button class="btn p" id="sim"><i class="fa-solid fa-robot"></i> Probar el asistente</button>' : '';
     $('sim') && ($('sim').onclick = simular);
     $('tabs').innerHTML = [['espera', 'En espera', R.enEspera], ['mias', 'Mías', R.mias], ...(R.bot || R.conBot ? [['bot', 'Con el bot', R.conBot, 1]] : []), ['activas', 'Activas'], ['cerradas', 'Cerradas']].map(([k, t, n, gris]) => `<button data-f="${k}" class="${filtro === k ? 'on' : ''}">${t}${n ? `<span class="n" ${gris ? 'style="background:var(--violeta)"' : ''}>${n}</span>` : ''}</button>`).join('');
     document.title = `${R.sinLeer ? `(${R.sinLeer}) ` : ''}WhatsApp — Katú POS`;
@@ -87,7 +87,7 @@
   async function cargarLista() {
     const d = await api(`/whatsapp/conversaciones?filtro=${filtro}&q=${encodeURIComponent($('q').value.trim())}`); if (!d.success) return;
     lista = d.data;
-    $('lista').innerHTML = lista.map(c => `<button class="wa-it ${actual?._id === c._id ? 'on' : ''}" data-c="${c._id}"><span class="wa-av">${esc(iniciales(c.nombre) || '#')}</span><span style="min-width:0"><b>${esc(c.nombre || c.telefono)}</b><small>${esc(c.ultimoTexto)}</small>${c.asesor && filtro !== 'mias' ? `<small><i class="fa-solid fa-headset"></i> ${esc(c.asesor.nombre)}</small>` : ''}</span><span class="r">${cuando(c.ultimoEn)}${c.sinLeer ? `<span class="n">${c.sinLeer}</span>` : ''}</span></button>`).join('') || '<div class="nada">No hay conversaciones</div>';
+    $('lista').innerHTML = lista.map(c => `<button class="wa-it ${actual?._id === c._id ? 'on' : ''}" data-c="${c._id}"><span class="wa-av">${esc(iniciales(c.nombre) || '#')}</span><span style="min-width:0"><b>${esc(c.nombre || c.telefono)}${c.prueba ? ' <span class="bd vi">Prueba</span>' : ''}</b><small>${esc(c.ultimoTexto)}</small>${c.asesor && filtro !== 'mias' ? `<small><i class="fa-solid fa-headset"></i> ${esc(c.asesor.nombre)}</small>` : ''}</span><span class="r">${cuando(c.ultimoEn)}${c.sinLeer ? `<span class="n">${c.sinLeer}</span>` : ''}</span></button>`).join('') || '<div class="nada">No hay conversaciones</div>';
   }
   $('lista').onclick = e => { const b = e.target.closest('[data-c]'); if (b) abrir(b.dataset.c); };
   async function refrescar() {
@@ -135,7 +135,7 @@
       ${c.estado !== 'cerrada' ? '<button class="btn sm" data-a="cerrar"><i class="fa-solid fa-check"></i> Cerrar</button>' : ''}</div></header>
       <div class="wa-msgs" id="msgs"></div>
       ${c.estado === 'bot' ? '<div class="wa-aviso" style="background:var(--violeta-light);color:var(--violeta)"><i class="fa-solid fa-robot"></i> El asistente de IA está atendiendo. Si escribes o tomas la conversación, el bot deja de responder.</div>' : ''}${c.ventanaAbierta ? '' : '<div class="wa-aviso"><i class="fa-solid fa-clock"></i> Pasaron más de 24 horas desde el último mensaje del cliente. WhatsApp no permite escribirle hasta que vuelva a escribir.</div>'}
-      <div class="wa-comp"><textarea class="in" id="txt" placeholder="${c.ventanaAbierta ? 'Escribe una respuesta… (Enter envía, Shift+Enter salto de línea)' : 'Ventana de 24 h cerrada'}" ${c.ventanaAbierta && R.listo ? '' : 'disabled'}></textarea><button class="btn p" id="env" ${c.ventanaAbierta && R.listo ? '' : 'disabled'}><i class="fa-solid fa-paper-plane"></i></button></div>`;
+      <div class="wa-comp"><textarea class="in" id="txt" placeholder="${c.ventanaAbierta ? 'Escribe una respuesta… (Enter envía, Shift+Enter salto de línea)' : 'Ventana de 24 h cerrada'}" ${c.ventanaAbierta && (R.listo || c.prueba) ? '' : 'disabled'}></textarea><button class="btn p" id="env" ${c.ventanaAbierta && R.listo ? '' : 'disabled'}><i class="fa-solid fa-paper-plane"></i></button></div>`;
     $('chat').querySelector('header .r').onclick = async e => {
       const a = e.target.closest('[data-a]')?.dataset.a; if (!a) return;
       if (a === 'cerrar' && !(await confirmar('Cerrar conversación', 'Si el cliente vuelve a escribir, se abre de nuevo en la cola.', 'Cerrar'))) return;
@@ -171,7 +171,7 @@
     $('lado').innerHTML = `<header><h3>Cliente</h3></header><div class="b">
       <div><b style="font-size:15px">${esc(c.cliente?.nombre || c.nombre || 'Sin nombre')}</b><p style="color:var(--muted);font-size:12.5px;margin-top:4px">${esc(c.telefono)}${c.cliente ? `<br>${esc(c.cliente.documento || '')} · ${fnum(c.cliente.puntos || 0)} puntos` : '<br>No está registrado como cliente'}</p></div>
       ${c.ubicacion ? `<div class="f"><label>Última ubicación compartida</label><div class="wa-mapa" id="mapaLado"></div><small>${esc(c.ubicacion.direccion || '')}</small></div>` : '<p style="font-size:12.5px;color:var(--muted)">Pide al cliente que comparta su ubicación por WhatsApp para validar la cobertura.</p>'}
-      <button class="btn p" id="nuevoPed" ${R.listo ? '' : 'disabled'}><i class="fa-solid fa-motorcycle"></i> Crear pedido</button>
+      <button class="btn p" id="nuevoPed" ${R.listo || c.prueba ? '' : 'disabled'}><i class="fa-solid fa-motorcycle"></i> Crear pedido</button>
       <div><label style="font-size:12px;font-weight:600;color:var(--muted)">Pedidos recientes</label>${c.pedidos.map(p => `<div class="wa-ped"><span><b>${esc(p.numero)}</b><br><span style="color:var(--muted)">${cuando(p.createdAt)} · ${esc(p.estado.replace('_', ' '))}</span></span><b>${dinero(p.total)}</b></div>`).join('') || '<p style="font-size:12.5px;color:var(--faint);margin-top:6px">Sin pedidos</p>'}</div></div>`;
     if (c.ubicacion && window.L) { mapaLado?.remove(); mapaLado = L.map('mapaLado', { zoomControl: false, attributionControl: false }).setView([c.ubicacion.lat, c.ubicacion.lng], 15); L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19 }).addTo(mapaLado); L.marker([c.ubicacion.lat, c.ubicacion.lng]).addTo(mapaLado); }
     $('nuevoPed').onclick = crearPedido;
@@ -246,12 +246,24 @@
 
   // ── Simulador (sin Twilio) ──
   function simular() {
+    if (R.chatPrueba) return chatPrueba();
     const m = modal({ clase: 's', titulo: 'Simular mensaje de un cliente', html: '<div id="f"></div><p style="font-size:12px;color:var(--muted);margin-top:10px">Solo existe mientras el servidor no tenga credenciales de Twilio. No se envía nada real.</p>', pie: '<button class="btn p" data-s>Enviar como cliente</button>' });
     const f = formulario(m.q('#f'), [{ k: 'telefono', l: 'Celular del cliente', req: 1, w: 6 }, { k: 'nombre', l: 'Nombre de perfil', w: 6 }, { k: 'texto', l: 'Mensaje', t: 'area', w: 12 }, { k: 'ubicar', l: 'Compartir ubicación (cerca de la primera sede)', t: 'si', w: 12 }], { telefono: actual?.telefono?.replace(/^\+\d{2}/, '') || '3001234567', nombre: 'Cliente de prueba', texto: 'Hola, quiero hacer un pedido' });
     m.q('[data-s]').onclick = async () => {
       const o = f.validar(); if (!o) return;
       const r = await datos('/whatsapp/simular', 'POST', { ...o, ...(o.ubicar && { lat: 4.6520, lng: -74.0628, direccion: 'Ubicación del cliente' }) });
       if (r) { m.cerrar(); await refrescar(); if (r.conversacion) abrir(r.conversacion); }
+    };
+  }
+
+  // Chat de prueba: escribes como tu cliente; el asistente responde en la bandeja (nada sale por WhatsApp)
+  function chatPrueba() {
+    const m = modal({ clase: 's', titulo: 'Probar el asistente', html: '<div id="f"></div><p style="font-size:12px;color:var(--muted);margin-top:10px">Escribes como si fueras tu cliente. La conversación aparece en la bandeja con la etiqueta de prueba; puedes tomarla como asesor. Nada sale por WhatsApp.</p>', pie: '<button class="btn p" data-s>Enviar como cliente</button>' });
+    const f = formulario(m.q('#f'), [{ k: 'texto', l: 'Mensaje del cliente', t: 'area', w: 12, req: 1 }, { k: 'ubicar', l: 'Compartir ubicación (cerca de tu primera sede)', t: 'si', w: 12 }, { k: 'reiniciar', l: 'Empezar como cliente nuevo (borra el contexto del asistente)', t: 'si', w: 12 }], { texto: 'Hola, ¿qué tienen disponible hoy?' });
+    m.q('[data-s]').onclick = async () => {
+      const o = f.validar(); if (!o) return;
+      const r = await datos('/whatsapp/simular', 'POST', o);
+      if (r) { m.cerrar(); await refrescar(); if (r.conversacion) abrir(r.conversacion); toast('Enviado: el asistente responde en unos segundos'); }
     };
   }
 

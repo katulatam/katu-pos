@@ -24,6 +24,7 @@ const conversacionSchema = new mongoose.Schema({
   // Se reinicia cuando la conversación se reabre.
   ia: { type: mongoose.Schema.Types.Mixed, default: () => ({}) },
   cerradaEn: Date,
+  prueba:   { type: Boolean, default: false },              // chat de prueba del asistente: nada sale por WhatsApp
 }, { timestamps: true });
 conversacionSchema.index({ empresa: 1, telefono: 1 }, { unique: true });
 conversacionSchema.index({ empresa: 1, estado: 1, ultimoEn: -1 });

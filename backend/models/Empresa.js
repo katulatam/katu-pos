@@ -42,6 +42,7 @@ const empresaSchema = new mongoose.Schema({
     actualHasta: Date,                 // fin del periodo pagado
     moraDesde:   Date,                 // primer cobro fallido (periodo de gracia)
     pruebaHasta: Date,                 // fin de la prueba gratis sin tarjeta (utils/prueba.js)
+    cortesia:  Boolean,                // cuenta de Katú sin cobro (demos, aliados, facturación por fuera)
     avisosPrueba: [String],            // correos de la prueba ya enviados: d5, d1, fin
   },
 

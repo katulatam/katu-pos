@@ -6,5 +6,6 @@ r.use(proteger, soloSuper);
 r.get('/', c.listar);
 r.post('/', c.crear);
 r.put('/:id', c.actualizar);
+r.put('/:id/cortesia', c.cortesia);
 
 module.exports = r;

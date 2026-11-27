@@ -27,6 +27,20 @@ exports.crear = manejar(async (req, res) => {
   return empresa;
 });
 
+// Cuenta de Katú sin cobro: quita la prueba gratis (o la deja permanente) y no vence nunca.
+// Sirve para demos, aliados o clientes que Katú factura por fuera de Stripe.
+exports.cortesia = manejar(async req => {
+  const e = await Empresa.findById(req.params.id).lean();
+  if (!e) throw new ErrorApi('Empresa no encontrada', 404);
+  const s = e.suscripcion || {};
+  if (s.stripeSuscripcion && s.estado !== 'cancelada') throw new ErrorApi('Esta empresa paga con Stripe: cancela primero su suscripción en Stripe', 409);
+  const activar = req.body.activa !== false;
+  await Empresa.updateOne({ _id: e._id }, activar
+    ? { $set: { estado: true, 'suscripcion.estado': 'activa', 'suscripcion.cortesia': true, 'suscripcion.plan': s.plan || 'premium' }, $unset: { 'suscripcion.pruebaHasta': 1, 'suscripcion.avisosPrueba': 1, 'suscripcion.moraDesde': 1 } }
+    : { $unset: { 'suscripcion.cortesia': 1 } });
+  return Empresa.findById(e._id).lean();
+});
+
 exports.actualizar = manejar(async req => {
   const doc = await Empresa.findById(req.params.id);
   if (!doc) throw new ErrorApi('Empresa no encontrada', 404);

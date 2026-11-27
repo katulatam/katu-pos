@@ -62,7 +62,9 @@ exports.resumen = manejar(async req => {
     Conversacion.countDocuments({ ...f, estado: { $ne: 'cerrada' }, sinLeer: { $gt: 0 }, $or: [{ estado: 'espera' }, { asesor: req.usuario._id }] }),
   ]);
   return {
-    enEspera, mias, sinLeer, listo: wa.listo(e), simulador: wa.twilio.simulado(), bot: bot.activo(e), conBot: await Conversacion.countDocuments({ ...f, estado: 'bot' }),
+    enEspera, mias, sinLeer, listo: wa.listo(e), simulador: wa.twilio.simulado(), bot: bot.activo(e),
+    // Sin número todavía: puede probar el asistente con un cliente ficticio
+    chatPrueba: !wa.twilio.simulado() && !wa.listo(e) && !!e.modulos?.whatsapp, conBot: await Conversacion.countDocuments({ ...f, estado: 'bot' }),
     numero: e.whatsapp?.numero || '', estado: e.whatsapp?.estado || 'sin_configurar', saldo: e.mensajeria?.saldoWhatsapp || 0,
     medios: mediosDe(e, req.pais, 'domicilio').map(m => ({ codigo: m.codigo, nombre: m.nombre, tipo: m.tipo })),
     sedes: await Sede.find({ empresa: e._id, activo: true }).select('nombre').lean(), recoger: e.domicilios?.recogerEnTienda !== false,
@@ -171,12 +173,23 @@ exports.media = async (req, res) => {
   } catch (e) { res.status(e.status || 502).json({ success: false, error: e.message }); }
 };
 
-// Solo con el simulador: un "cliente" escribe, para probar la bandeja sin Twilio
+// Un "cliente" escribe para probar la bandeja y el asistente. Dos modos:
+//  - simulador (servidor sin Twilio, desarrollo): cualquier teléfono
+//  - chat de prueba (empresa sin número todavía, p. ej. en la prueba gratis): cliente
+//    ficticio fijo; las respuestas se guardan en la bandeja y nada sale por WhatsApp
 exports.simular = manejar(async req => {
-  if (!wa.twilio.simulado()) throw new ErrorApi('El simulador solo existe sin credenciales de Twilio', 403);
+  const prueba = !wa.twilio.simulado();
+  if (prueba && wa.listo(req.empresa)) throw new ErrorApi('Tu WhatsApp ya está activo: escríbele a tu número desde tu celular para probarlo', 409);
   const b = req.body;
-  const tel = wa.aE164(req.pais, b.telefono || '3000000000');
-  const conv = await wa.recibir(req.empresa, { From: `whatsapp:${tel}`, Body: b.texto || '', ProfileName: b.nombre || '', MessageSid: 'SMsim' + crypto.randomBytes(15).toString('hex'), ...(b.lat && { Latitude: b.lat, Longitude: b.lng, Address: b.direccion || '' }) });
+  const tel = prueba ? wa.telPrueba(req.pais) : wa.aE164(req.pais, b.telefono || '3000000000');
+  // Reiniciar: la conversación de prueba empieza de cero (como un cliente nuevo)
+  if (prueba && b.reiniciar) await Conversacion.updateOne({ empresa: req.empresa._id, telefono: tel }, { estado: 'cerrada', cerradaEn: new Date(), sinLeer: 0 });
+  // Ubicación del "cliente": cerca de la primera sede con ubicación
+  if (b.ubicar && !b.lat) {
+    const s = await Sede.findOne({ empresa: req.empresa._id, activo: true, 'ubicacion.lat': { $exists: true } }).select('ubicacion').lean();
+    if (s?.ubicacion?.lat) Object.assign(b, { lat: s.ubicacion.lat + 0.004, lng: s.ubicacion.lng + 0.003, direccion: 'Ubicación del cliente de prueba' });
+  }
+  const conv = await wa.recibir(req.empresa, { From: `whatsapp:${tel}`, Body: b.texto || '', ProfileName: b.nombre || (prueba ? 'Cliente de prueba' : ''), MessageSid: 'SMsim' + crypto.randomBytes(15).toString('hex'), ...(b.lat && { Latitude: b.lat, Longitude: b.lng, Address: b.direccion || '' }) }, { prueba });
   return { conversacion: conv?._id };
 });
 
@@ -193,7 +206,7 @@ exports.config = manejar(async req => {
   const e = await Empresa.findById(req.empresa._id).lean();
   // Número de Katú asignado que espera la aprobación de WhatsApp
   const prep = await require('../models/NumeroWhatsapp').findOne({ empresa: e._id, estado: 'asignado' }).lean();
-  return { ...vistaConfig(e), preparando: prep?.numero || '' };
+  return { ...vistaConfig(e), preparando: prep?.numero || '', enPrueba: require('../utils/prueba').enPrueba(e) };
 });
 // Lo que ajusta el comercio
 exports.guardarConfig = manejar(async req => {

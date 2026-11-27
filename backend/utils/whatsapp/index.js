@@ -62,8 +62,12 @@ async function vincular(empresa, pais, telefono) {
   return { ...(cliente && { cliente: cliente._id }), ...(cuenta && { cuenta: cuenta._id }) };
 }
 
+// Chat de prueba del asistente (empresas sin número todavía, p. ej. en la prueba gratis):
+// un "cliente" ficticio con un teléfono que no existe; nada sale por WhatsApp.
+const telPrueba = pais => `+${pais?.prefijoTelefono || '1'}0000000000`;
+
 // p: parámetros del webhook de Twilio (From, Body, ProfileName, MessageSid, NumMedia, MediaUrl0…, Latitude…)
-async function recibir(empresa, p) {
+async function recibir(empresa, p, { prueba = false } = {}) {
   const telefono = '+' + soloDigitos(String(p.From || '').replace(/^whatsapp:/, ''));
   if (telefono.length < 8) return null;
   if (p.MessageSid && await Mensaje.exists({ sid: p.MessageSid })) return null; // Twilio reintentó
@@ -76,9 +80,10 @@ async function recibir(empresa, p) {
   const antes = await Conversacion.findOne({ empresa: empresa._id, telefono }).lean();
   const nueva = !antes || antes.estado === 'cerrada';
   const bot = require('./bot');
-  const conBot = nueva && bot.activo(empresa);
+  // En el chat de prueba el asistente atiende siempre que el servidor tenga IA
+  const conBot = nueva && (prueba ? require('../ia/openrouter').disponible() : bot.activo(empresa));
   const conv = await Conversacion.findOneAndUpdate({ empresa: empresa._id, telefono }, {
-    $set: { ultimoTexto: resumen.slice(0, 160), ultimoEn: new Date(), ultimaEntrante: new Date(), ...(p.ProfileName && { nombre: String(p.ProfileName).slice(0, 80) }),
+    $set: { ultimoTexto: resumen.slice(0, 160), ultimoEn: new Date(), ultimaEntrante: new Date(), ...(p.ProfileName && { nombre: String(p.ProfileName).slice(0, 80) }), ...(prueba && { prueba: true }),
       ...(ubicacion && { ubicacion: { ...ubicacion, en: new Date() } }), ...(nueva && { estado: conBot ? 'bot' : 'espera', asesor: null, cerradaEn: null, ia: {} }),
       ...(!antes && await vincular(empresa, pais, telefono)) },
     $inc: { sinLeer: 1 },
@@ -125,12 +130,14 @@ async function _registrar(empresa, conv, datos, envio) {
 }
 // Texto libre: solo dentro de la ventana de 24 h. Gratis y nunca se corta por saldo.
 async function enviarTexto({ empresa, conversacion, texto, usuario, autor = 'asesor' }) {
-  if (!listo(empresa)) throw new ErrorApi('El WhatsApp de la empresa no está activo', 409, 'WHATSAPP_INACTIVO');
+  const conv = await Conversacion.findById(conversacion._id).lean();
+  // Chat de prueba: se guarda en la bandeja y no sale por WhatsApp
+  if (!conv?.prueba && !listo(empresa)) throw new ErrorApi('El WhatsApp de la empresa no está activo', 409, 'WHATSAPP_INACTIVO');
   texto = String(texto || '').trim().slice(0, 4096);
   if (!texto) throw new ErrorApi('Escribe un mensaje');
-  const conv = await Conversacion.findById(conversacion._id).lean();
   if (!ventanaAbierta(conv)) throw new ErrorApi('Pasaron más de 24 horas desde el último mensaje del cliente: WhatsApp solo permite escribirle con una plantilla aprobada', 409, 'VENTANA_CERRADA');
-  return _registrar(empresa, conv, { autor, usuario, texto }, () => twilio.enviar(remitente(empresa), { a: conv.telefono, texto, aviso: urls(empresa._id).estado }));
+  const envio = conv.prueba ? async () => ({ sid: 'prueba' + require('crypto').randomBytes(12).toString('hex'), estado: 'entregado' }) : () => twilio.enviar(remitente(empresa), { a: conv.telefono, texto, aviso: urls(empresa._id).estado });
+  return _registrar(empresa, conv, { autor, usuario, texto }, envio);
 }
 // Plantilla aprobada (inicia el comercio). Solo las campañas de marketing consumen
 // la bolsa prepagada; los avisos de pedidos van incluidos en el plan (Katú asume
@@ -160,11 +167,14 @@ function textoPedido(p, pais, empresa) {
 async function notificarPedido(empresaId, pedido) {
   try {
     const empresa = await Empresa.findById(empresaId).lean();
-    if (!listo(empresa) || empresa.whatsapp.notificarPedidos === false || !pedido?.contacto?.telefono) return;
+    if (!empresa || empresa.whatsapp?.notificarPedidos === false || !pedido?.contacto?.telefono) return;
     const pais = await paisDe(empresa);
     const texto = textoPedido(pedido, pais, empresa); if (!texto) return;
     const telefono = aE164(pais, pedido.contacto.telefono);
     const conv = await Conversacion.findOne({ empresa: empresa._id, telefono }).lean();
+    // El chat de prueba también recibe los avisos (sin salir por WhatsApp)
+    if (conv?.prueba) { if (ventanaAbierta(conv)) await enviarTexto({ empresa, conversacion: conv, texto, autor: 'sistema' }); return; }
+    if (!listo(empresa)) return;
     if (ventanaAbierta(conv)) return void await enviarTexto({ empresa, conversacion: conv, texto, autor: 'sistema' });
     const plantilla = empresa.whatsapp.plantillas?.[pedido.estado];
     if (!plantilla) return; // sin plantilla aprobada no se puede escribir fuera de la ventana
@@ -172,4 +182,4 @@ async function notificarPedido(empresaId, pedido) {
   } catch (e) { console.error('[whatsapp.aviso]', pedido?.numero, e.message); }
 }
 
-module.exports = { urls, aE164, aLocal, ventanaAbierta, listo, consumir, recargar, recibir, actualizarEstado, enviarTexto, enviarPlantilla, notificarPedido, twilio };
+module.exports = { urls, aE164, aLocal, telPrueba, ventanaAbierta, listo, consumir, recargar, recibir, actualizarEstado, enviarTexto, enviarPlantilla, notificarPedido, twilio };

@@ -6,6 +6,7 @@ const { urls } = require('./index');
 const correo = require('../correo/sendgrid');
 const empresas = require('../empresas');
 const { ErrorApi } = require('../contexto');
+const { enPrueba } = require('../prueba');
 
 // ── Números de WhatsApp de Katú ────────────────────────────────────────────
 // Katú compra números de EE. UU. en Twilio y los asigna a las empresas con
@@ -22,10 +23,11 @@ async function listar() {
   const [numeros, sinNumero] = await Promise.all([
     NumeroWhatsapp.find().populate('empresa', 'nombre slug').sort({ estado: 1, createdAt: -1 }).lean(),
     // Empresas que pueden recibir un número: plan con WhatsApp y sin número
-    Empresa.find({ estado: true, 'modulos.whatsapp': true }).select('nombre slug pais whatsapp.estado').lean(),
+    Empresa.find({ estado: true, 'modulos.whatsapp': true }).select('nombre slug pais whatsapp.estado suscripcion').lean(),
   ]);
   const ocupadas = new Set(numeros.filter(n => n.empresa).map(n => String(n.empresa._id)));
-  return { numeros, empresas: sinNumero.filter(e => !ocupadas.has(String(e._id))).map(e => ({ _id: e._id, nombre: e.nombre, slug: e.slug, pais: e.pais })), simulado: twilio.simulado() };
+  // Las empresas en prueba gratis no reciben número (salvo que se vuelvan Cuenta Katú)
+  return { numeros, empresas: sinNumero.filter(e => !ocupadas.has(String(e._id)) && !enPrueba(e)).map(e => ({ _id: e._id, nombre: e.nombre, slug: e.slug, pais: e.pais })), simulado: twilio.simulado() };
 }
 
 const buscar = q => twilio.buscarNumeros({ codigoArea: /^\d{3}$/.test(String(q.codigoArea || '')) ? q.codigoArea : undefined });
@@ -52,6 +54,7 @@ async function asignar({ empresa: empresaId, numero: numeroId, comprarSiFalta },
   let e = await Empresa.findById(empresaId).lean();
   if (!e) throw new ErrorApi('Empresa no encontrada', 404);
   if (!e.modulos?.whatsapp) throw new ErrorApi('El plan de esta empresa no incluye WhatsApp (solo Pro y Premium)', 409);
+  if (enPrueba(e)) throw new ErrorApi('La empresa está en prueba gratis: el número se asigna al suscribirse. Para una demo, conviértela en Cuenta Katú.', 409);
   if (await NumeroWhatsapp.exists({ empresa: e._id })) throw new ErrorApi('Esta empresa ya tiene un número asignado', 409);
   if (!twilio.disponible()) throw new ErrorApi('Faltan las credenciales de Twilio de Katú en el servidor', 503);
   if (!e.whatsapp?.subcuentaSid) {
@@ -193,4 +196,36 @@ async function revisar() {
   return activados;
 }
 
-module.exports = { listar, buscar, comprar, registrar, asignar, guia, verificar, liberar, darDeBaja, revisar, AVISOS };
+// Correo interno al equipo Katú (KATU_AVISOS_CORREO o, si falta, KATU_ADMIN_EMAIL)
+async function avisarEquipo(asunto, lineas) {
+  const a = String(process.env.KATU_AVISOS_CORREO || process.env.KATU_ADMIN_EMAIL || '').trim();
+  if (!a) return;
+  const texto = lineas.join('\n');
+  const html = `<div style="font-family:Arial,Helvetica,sans-serif;font-size:14px;line-height:1.6;color:#0B1729">${lineas.map(l => `<p style="margin:0 0 8px">${String(l).replace(/[<>&]/g, c => ({ '<': '&lt;', '>': '&gt;', '&': '&amp;' }[c]))}</p>`).join('')}</div>`;
+  try { await correo.enviar({ a, asunto: `[Katú POS] ${asunto}`, html, texto, nombreRemitente: 'Katú POS' }); }
+  catch (x) { console.error('[correo] aviso al equipo NO enviado:', x.message); }
+}
+
+// Al suscribirse a Pro o Premium: número del inventario (o comprado) y aviso al
+// equipo para registrarlo en WhatsApp. Nunca lanza: no puede frenar el alta.
+async function asignarAlSuscribirse(empresaId) {
+  const e = await Empresa.findById(empresaId).lean().catch(() => null);
+  if (!e?.modulos?.whatsapp || e.whatsapp?.numero || enPrueba(e) || await NumeroWhatsapp.exists({ empresa: e._id })) return null;
+  const admin = `${String(process.env.PUBLIC_URL || '').replace(/\/+$/, '')}/admin/numeros.html`;
+  try {
+    const r = await asignar({ empresa: e._id, comprarSiFalta: true });
+    await avisarEquipo(`Registrar el WhatsApp de ${e.nombre}`, [
+      `${e.nombre} (${e.slug}) se suscribió a un plan con WhatsApp y se le asignó el número ${r.numero}.`,
+      `Falta registrarlo como remitente de WhatsApp en la consola de Twilio, subcuenta "${r.guia.subcuenta}".`,
+      `La guía con los datos del perfil está en Katú → Números de WhatsApp: ${admin}`,
+      'Cuando Meta lo apruebe, Katú POS lo activa solo y le avisa al cliente.',
+    ]);
+    return r;
+  } catch (x) {
+    console.error('[whatsapp.numeros] asignación automática', e.slug, x.message);
+    await avisarEquipo(`Asignar a mano el WhatsApp de ${e.nombre}`, [`${e.nombre} (${e.slug}) se suscribió a un plan con WhatsApp, pero no se pudo asignar el número solo: ${x.message}`, `Asígnalo en Katú → Números de WhatsApp: ${admin}`]);
+    return null;
+  }
+}
+
+module.exports = { listar, buscar, comprar, registrar, asignar, asignarAlSuscribirse, guia, verificar, liberar, darDeBaja, revisar, AVISOS };

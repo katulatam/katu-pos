@@ -617,6 +617,7 @@ test('suscripción: landing → Stripe → alta automática, subdominio, mora, s
     const emp = await M('Empresa').findOne({ slug: 'mi-tienda' }).lean();
     assert.deepEqual([emp.modulos.whatsapp, emp.modulos.domicilios, emp.modulos.marketing, emp.modulos.kiosco], [true, true, false, false]);
     assert.deepEqual([emp.suscripcion.plan, emp.suscripcion.estado, emp.suscripcion.stripeSuscripcion], ['pro', 'activa', 'sub_1']);
+    assert.equal((await M('NumeroWhatsapp').findOne({ empresa: emp._id }).lean())?.estado, 'asignado', 'Pro incluye número: se asigna solo al pagar');
     const est = ok(await api('', 'GET', '/registro/estado/' + ck.registro));
     assert.deepEqual([est.estado, est.url], ['listo', 'https://mi-tienda.katupos.test/admin/']);
 
@@ -672,6 +673,19 @@ test('suscripción: landing → Stripe → alta automática, subdominio, mora, s
     ok(await api('', 'POST', '/auth/crear-clave', { token: await require('../utils/empresas').enlaceClave(luis._id), password: 'ClaveLuis123' }));
     tk.luis = ok(await api('', 'POST', '/auth/login', { correo: 'luis@prueba.co', password: 'ClaveLuis123' }, { 'X-Forwarded-Host': 'tienda-prueba.katupos.test' })).token;
     const sp = ok(await api('luis', 'GET', '/cuenta/suscripcion'));
+    assert.equal(await M('NumeroWhatsapp').exists({ empresa: tp._id }), null, 'la prueba gratis no recibe número');
+    assert.match(no(await api('super', 'POST', '/numeros/asignar', { empresa: tp._id }), 409).error, /prueba gratis/);
+    process.env.TWILIO_ACCOUNT_SID = 'ACfalso'; // como en producción: sin simulador, el chat de prueba no toca Twilio
+    try {
+      assert.equal(ok(await api('luis', 'GET', '/whatsapp/resumen')).chatPrueba, true);
+      const cp = ok(await api('luis', 'POST', '/whatsapp/simular', { texto: 'Hola, ¿tienen leche?', reiniciar: true }));
+      const conv = await M('Conversacion').findById(cp.conversacion).lean();
+      assert.deepEqual([conv.prueba, conv.telefono], [true, '+570000000000']);
+      ok(await api('luis', 'POST', `/whatsapp/conversaciones/${conv._id}/tomar`));
+      const m = ok(await api('luis', 'POST', `/whatsapp/conversaciones/${conv._id}/mensajes`, { texto: 'Sí, tenemos' }));
+      const enviado = await M('Mensaje').findById(m._id).lean();
+      assert.ok(enviado.estado === 'entregado' && /^prueba/.test(enviado.sid), 'no sale por WhatsApp');
+    } finally { process.env.TWILIO_ACCOUNT_SID = ''; }
     assert.deepEqual([sp.enPrueba, sp.diasRestantes, sp.vencida, sp.planes.length], [true, 15, false, 3]);
     assert.equal(await sus.revisarPruebas(), 0);
     // Faltan 4 días → aviso de 5 días (una sola vez)
@@ -754,4 +768,11 @@ test('números de WhatsApp de Katú: comprar, asignar (solo Pro/Premium), activa
   no(await api('super', 'DELETE', `/numeros/${n2._id}`), 409);
   ok(await api('super', 'DELETE', `/numeros/${n1._id}`));
   assert.equal(await M('NumeroWhatsapp').countDocuments({ _id: n1._id }), 0);
+
+  // Cuenta de Katú sin cobro (demo): sale de la prueba gratis y no vence
+  await M('Empresa').updateOne({ _id: otra._id }, { suscripcion: { plan: 'premium', estado: 'prueba', pruebaHasta: new Date(Date.now() + 3 * 86400000) } });
+  no(await api('admin', 'PUT', `/empresas/${otra._id}/cortesia`, { activa: true }), 403);
+  const c = ok(await api('super', 'PUT', `/empresas/${otra._id}/cortesia`, { activa: true }));
+  assert.deepEqual([c.suscripcion.estado, c.suscripcion.cortesia, c.suscripcion.pruebaHasta, c.estado], ['activa', true, undefined, true]);
+  assert.equal(require('../utils/prueba').enPrueba(c), false);
 });

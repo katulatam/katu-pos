@@ -172,7 +172,7 @@ async function pasarAAsesor(empresa, conv, motivo, aviso) {
 
 async function turno(empresaId, convId) {
   const [empresa, conv] = await Promise.all([Empresa.findById(empresaId).lean(), Conversacion.findById(convId).populate('cliente', 'nombre').lean()]);
-  if (!conv || conv.estado !== 'bot' || !activo(empresa)) return;
+  if (!conv || conv.estado !== 'bot' || !(conv.prueba ? ia.disponible() : activo(empresa))) return; // chat de prueba: atiende con IA aunque el bot no esté activado
   const iaPrevia = conv.ia || {};
   const nuevos = await Mensaje.find({ conversacion: conv._id, direccion: 'entrante', ...(iaPrevia.hasta && { createdAt: { $gt: new Date(iaPrevia.hasta) } }) }).sort({ createdAt: 1 }).limit(20).lean();
   if (!nuevos.length) return;
