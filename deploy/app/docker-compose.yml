@@ -3,12 +3,14 @@
 # o pega este archivo en "Web editor". Las variables van en "Environment variables"
 # del stack (usa deploy/.env.produccion.example como lista). Deben ser IDÉNTICAS en
 # ambos servidores, en especial JWT_SECRET (si no, las sesiones fallan al balancear).
+# La imagen la construye GitHub Actions en cada push a main (.github/workflows/imagen.yml)
+# y queda en el registro privado ghcr.io. En Portainer hay que registrar ghcr.io una vez
+# (Registries) con un token de GitHub con permiso read:packages.
+# VERSION: "latest" o el SHA de un commit para fijar/volver a una versión exacta.
 services:
   katupos:
-    build:
-      context: ../..
-      dockerfile: Dockerfile
-    image: katupos/app:${VERSION:-latest}
+    image: ghcr.io/katulatam/katu-pos:${VERSION:-latest}
+    pull_policy: always
     container_name: katupos
     restart: unless-stopped
     ports:
