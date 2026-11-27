@@ -3,7 +3,7 @@ const Empresa = require('../models/Empresa');
 const { manejar, ErrorApi, limpiarCachePaises } = require('../utils/contexto');
 const { PROVEEDORES } = require('../utils/facturacion');
 
-const CAMPOS = ['nombre', 'moneda', 'simbolo', 'decimales', 'locale', 'zonaHoraria', 'zonasHorarias', 'prefijoTelefono', 'nombreIdFiscal', 'redondeoEfectivo', 'billetes', 'impuestos', 'impuestoDefecto', 'tiposDocumento', 'consumidorFinal', 'mediosPago', 'facturacion', 'activo'];
+const CAMPOS = ['nombre', 'moneda', 'simbolo', 'decimales', 'locale', 'zonaHoraria', 'zonasHorarias', 'prefijoTelefono', 'nombreIdFiscal', 'redondeoEfectivo', 'billetes', 'impuestos', 'impuestoDefecto', 'tiposDocumento', 'consumidorFinal', 'mediosPago', 'facturacion', 'bolsas', 'activo'];
 const zonaValida = z => { try { new Intl.DateTimeFormat('es', { timeZone: z }); return !!z; } catch { return false; } };
 function validar(d) {
   if (d.zonaHoraria && !zonaValida(d.zonaHoraria)) throw new ErrorApi('Zona horaria inválida');
@@ -14,6 +14,7 @@ function validar(d) {
   if (d.locale) { try { new Intl.NumberFormat(d.locale); } catch { throw new ErrorApi('Configuración regional inválida (ej. es-CO)'); } }
   if (d.impuestos && d.impuestoDefecto && !d.impuestos.some(i => i.codigo === d.impuestoDefecto)) throw new ErrorApi('El impuesto por defecto no está en la lista');
   if (d.facturacion?.proveedor && !PROVEEDORES[d.facturacion.proveedor]) throw new ErrorApi('Proveedor de facturación no soportado');
+  if (d.bolsas) { d.bolsas = { moneda: String(d.bolsas.moneda || 'USD').toUpperCase().trim(), paquetes: (d.bolsas.paquetes || []).map(p => ({ canal: p.canal, cantidad: Number(p.cantidad), precio: Number(p.precio) })) }; require('../utils/bolsas').validarPaquetes(d.bolsas); }
   if (d.facturacion?.ofrecida && !d.facturacion.proveedor) throw new ErrorApi('Para ofrecer facturación electrónica en el país elige su proveedor');
 }
 

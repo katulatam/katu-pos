@@ -26,6 +26,15 @@
   if (!(await POS.listo)) return;
   const main = document.querySelector('main');
   const SUP = POS.esSuper, ADM = POS.user.rol === 'admin' || SUP;
+  // Vuelta de Stripe tras comprar una bolsa: se confirma sin esperar al webhook
+  const sesion = new URLSearchParams(location.search).get('compra');
+  if (sesion) {
+    history.replaceState(null, '', location.pathname);
+    let r = null;
+    for (let i = 0; i < 6 && !r?.pagada; i++) { r = (await api('/cuenta/bolsas/confirmar', 'POST', { sesion })).data; if (!r?.pagada) await new Promise(x => setTimeout(x, 2000)); }
+    toast(r?.pagada ? `¡Listo! Sumamos ${fnum(r.cantidad)} ${r.canal === 'whatsapp' ? 'mensajes de WhatsApp' : 'correos'} a tu bolsa` : 'Tu pago se está procesando: el saldo se sumará en unos minutos', r?.pagada ? 'bien' : 'mal');
+  }
+  document.querySelector('main').addEventListener('click', e => { const b = e.target.closest('[data-comprar]'); if (b) POS.comprarBolsa(b.dataset.comprar); });
   async function cargar() {
     const [c, mv] = await Promise.all([datos('/whatsapp/config'), datos('/whatsapp/movimientos')]); if (!c) return;
     const paso = (ok, t, s) => `<div class="paso ${ok ? 'ok' : ''}"><i class="fa-solid ${ok ? 'fa-check' : 'fa-circle'}"></i><div>${t}${s ? `<small>${s}</small>` : ''}</div></div>`;
@@ -34,8 +43,8 @@
       ${!c.modulo ? '<div class="aviso m"><i class="fa-solid fa-lock"></i> El módulo <b>Domicilios por WhatsApp</b> no está activo para esta empresa. Lo activa el equipo de Katú según la suscripción.</div>' : ''}
       <div class="kpis">
         <div class="card"><div class="b"><small style="color:var(--muted)">Estado</small><b style="font-size:20px">${c.preparando ? 'Preparando tu número' : c.enPrueba && c.estado !== 'activo' ? 'Disponible al suscribirte' : { sin_configurar: c.modulo ? 'Lo prepara Katú' : 'Sin configurar', subcuenta: 'Lo prepara Katú', activo: 'Activo' }[c.estado]}</b><small style="color:var(--muted)">${c.preparando ? `${esc(c.preparando)} · WhatsApp lo está aprobando; te avisamos por correo cuando esté listo.` : esc(c.numero || (c.enPrueba ? 'Al suscribirte a Pro o Premium te asignamos tu número. Mientras tanto, prueba el asistente en WhatsApp → Probar el asistente.' : c.modulo ? 'Katú te asigna un número: no tienes que hacer nada.' : 'Disponible en los planes Pro y Premium'))}</small></div></div>
-        <div class="card"><div class="b"><small style="color:var(--muted)">Mensajes de WhatsApp disponibles</small><b style="font-size:20px;${c.saldoWhatsapp < 0 ? 'color:var(--danger)' : ''}">${fnum(c.saldoWhatsapp)}</b><small style="color:var(--muted)">Solo para campañas de marketing. Atender a tus clientes, el asistente de IA y los avisos de pedidos están incluidos en tu plan.</small></div></div>
-        <div class="card"><div class="b"><small style="color:var(--muted)">Correos disponibles</small><b style="font-size:20px">${fnum(c.saldoCorreo)}</b><small style="color:var(--muted)">Para campañas de marketing</small></div></div>
+        <div class="card"><div class="b"><small style="color:var(--muted)">Mensajes de WhatsApp disponibles</small><b style="font-size:20px;${c.saldoWhatsapp < 0 ? 'color:var(--danger)' : ''}">${fnum(c.saldoWhatsapp)}</b><small style="color:var(--muted)">Solo para campañas de marketing. Atender a tus clientes, el asistente de IA y los avisos de pedidos están incluidos en tu plan.</small>${ADM ? '<button class="btn sm p" data-comprar="whatsapp" style="align-self:flex-start;margin-top:6px"><i class="fa-solid fa-cart-shopping"></i> Comprar mensajes</button>' : ''}</div></div>
+        <div class="card"><div class="b"><small style="color:var(--muted)">Correos disponibles</small><b style="font-size:20px">${fnum(c.saldoCorreo)}</b><small style="color:var(--muted)">Para campañas de marketing. No vencen.</small>${ADM ? '<button class="btn sm p" data-comprar="correo" style="align-self:flex-start;margin-top:6px"><i class="fa-solid fa-cart-shopping"></i> Comprar correos</button>' : ''}</div></div>
       </div>
       <div class="grid" style="align-items:start">
         <div class="card" style="grid-column:span 6"><header><h3>Avisos y respuesta automática</h3></header><div class="b">

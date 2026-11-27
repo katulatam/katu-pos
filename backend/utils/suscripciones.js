@@ -295,6 +295,8 @@ async function procesarEvento(ev) {
   const o = ev.data?.object || {};
   switch (ev.type) {
     case 'checkout.session.completed': {
+      // Pago único de una bolsa de mensajes de marketing
+      if (o.mode === 'payment' && o.metadata?.tipo === 'bolsa') { await require('./bolsas').acreditarDesdeSesion(o); break; }
       if (o.mode !== 'subscription') break;
       if (o.metadata?.empresa) { await activarDesdeSesion(o); break; }
       const id = o.metadata?.registro || o.client_reference_id;

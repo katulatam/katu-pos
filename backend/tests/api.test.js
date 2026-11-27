@@ -633,6 +633,14 @@ test('marketing: promoción del día (con imagen), correo con diseño y HTML pro
   assert.ok(vh.html.includes('Hola Valentina') && /Darme de baja/.test(vh.html));
   assert.ok(!/<script|onclick|javascript:|<iframe/i.test(vh.html));
 
+  // Plantillas propias: ejemplos válidos y revisión de las reglas de Meta
+  const ay = ok(await api('admin', 'GET', '/marketing/plantillas/ayuda'));
+  assert.ok(ay.ejemplos.length >= 5 && !ay.ejemplos.some(x => /{negocio}/.test(x.texto)));
+  for (const x of ay.ejemplos) assert.deepEqual(ok(await api('admin', 'POST', '/marketing/plantillas/revisar', { cuerpo: x.texto })).errores, [], x.titulo);
+  const rv = ok(await api('admin', 'POST', '/marketing/plantillas/revisar', { cuerpo: '{nombre} mira las ofertas en bit.ly/abc, hola' }));
+  assert.ok(rv.errores.some(x => /empezar/.test(x)) && rv.errores.some(x => /acortadores/.test(x)));
+  assert.match(no(await api('admin', 'POST', '/marketing/plantillas', { nombre: 'mala', cuerpo: 'Hola, compra hoy en {negocio} con descuento. Responde BAJA {nombre}' }), 400).error, /terminar/);
+
   // La imagen de la plantilla la sirve Katú; nunca descarga direcciones internas
   const img = await fetch(base + '/publico/promo-img/muestra');
   assert.deepEqual([img.status, img.headers.get('content-type')], [200, 'image/png']);
@@ -776,6 +784,22 @@ test('suscripción: landing → Stripe → alta automática, subdominio, mora, s
     assert.deepEqual([tp.suscripcion.estado, tp.suscripcion.plan, tp.suscripcion.stripeSuscripcion, tp.suscripcion.pruebaHasta, tp.modulos.kiosco, tp.modulos.facturacion], ['activa', 'basico', 'sub_2', undefined, false, true]);
     ok(await api('luis', 'GET', '/productos'));
     no(await api('luis', 'POST', '/cuenta/suscripcion/checkout', { plan: 'pro' }), 409);
+
+    // Bolsas de mensajes: paquetes por país (múltiplos de 1.000), compra con Stripe y saldo sin vencimiento
+    const co = ok(await api('super', 'GET', '/paises')).paises.find(p => p.codigo === 'CO');
+    no(await api('super', 'PUT', '/paises/' + co._id, { bolsas: { moneda: 'USD', paquetes: [{ canal: 'whatsapp', cantidad: 1500, precio: 10 }] } }), 400);
+    ok(await api('super', 'PUT', '/paises/' + co._id, { bolsas: { moneda: 'USD', paquetes: [{ canal: 'whatsapp', cantidad: 1000, precio: 12 }, { canal: 'correo', cantidad: 5000, precio: 8 }] } }));
+    const cat = ok(await api('luis', 'GET', '/cuenta/bolsas'));
+    assert.deepEqual(cat.paquetes.map(p => `${p.canal}-${p.cantidad}`), ['correo-5000', 'whatsapp-1000']);
+    no(await api('luis', 'POST', '/cuenta/bolsas/comprar', { canal: 'whatsapp', cantidad: 2000 }), 404);
+    const cb = ok(await api('luis', 'POST', '/cuenta/bolsas/comprar', { canal: 'whatsapp', cantidad: 1000 }));
+    const pb = recibidosStripe.filter(x => x.u === '/checkout/sessions').pop().body;
+    assert.deepEqual([pb.get('mode'), pb.get('line_items[0][price_data][unit_amount]'), pb.get('metadata[tipo]')], ['payment', '1200', 'bolsa']);
+    const antesB = (await M('Empresa').findById(tp._id).lean()).mensajeria?.saldoWhatsapp || 0;
+    const sesB = { mode: 'payment', payment_status: 'paid', payment_intent: 'pi_1', metadata: { tipo: 'bolsa', compra: String(cb.compra), empresa: String(tp._id), canal: 'whatsapp', cantidad: '1000' } };
+    for (let i = 0; i < 2; i++) assert.equal((await evento('checkout.session.completed', sesB)).status, 200);
+    assert.equal((await M('Empresa').findById(tp._id).lean()).mensajeria.saldoWhatsapp, antesB + 1000, 'se suma una sola vez');
+    assert.equal((await M('CompraBolsa').findById(cb.compra).lean()).estado, 'pagada');
 
     // Bloqueos: con dos contenedores, una tarea corre una sola vez
     const { conBloqueo } = require('../utils/bloqueo');

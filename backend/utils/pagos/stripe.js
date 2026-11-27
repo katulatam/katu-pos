@@ -56,6 +56,16 @@ function crearCheckout({ plan, periodo, correo, registroId, empresaId, exito, ca
     subscription_data: { metadata: meta, ...(!empresaId && plan.diasPrueba > 0 && { trial_period_days: plan.diasPrueba }) },
   }, registroId ? `checkout-${registroId}` : `checkout-empresa-${empresaId}-${crypto.randomUUID()}`);
 }
+// Pago único (bolsas de mensajes): mismo Checkout de Stripe, sin suscripción
+function crearPago({ nombre, monto, moneda, correo, cliente, referencia, metadata, exito, cancelar }) {
+  const m = String(moneda || 'USD').toLowerCase();
+  return llamar('post', '/checkout/sessions', {
+    mode: 'payment', ...(cliente ? { customer: cliente } : { customer_email: correo }), client_reference_id: String(referencia),
+    success_url: exito, cancel_url: cancelar, locale: 'es',
+    line_items: [{ quantity: 1, price_data: { currency: m, unit_amount: centavos(monto, m), product_data: { name: nombre } } }],
+    metadata, payment_intent_data: { metadata },
+  }, `pago-${referencia}`);
+}
 const sesion = id => llamar('get', `/checkout/sessions/${encodeURIComponent(id)}`);
 const portal = (cliente, volver) => llamar('post', '/billing_portal/sessions', { customer: cliente, return_url: volver });
 
@@ -74,4 +84,4 @@ function verificarEvento(cuerpoCrudo, cabecera) {
   return JSON.parse(cuerpoCrudo);
 }
 
-module.exports = { disponible, modoPrueba, crearCheckout, sesion, portal, verificarEvento, llamar, centavos, _interno: { aplanar } };
+module.exports = { disponible, modoPrueba, crearCheckout, crearPago, sesion, portal, verificarEvento, llamar, centavos, _interno: { aplanar } };

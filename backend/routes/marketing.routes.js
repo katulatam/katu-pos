@@ -11,6 +11,8 @@ r.get('/resumen', c.resumen);
 r.post('/segmento', c.segmento);
 r.get('/plantillas', c.plantillas);
 r.post('/plantillas', autorizar('admin'), c.crearPlantilla);
+r.get('/plantillas/ayuda', c.ayudaPlantilla);
+r.post('/plantillas/revisar', c.revisarPlantilla);
 r.get('/campanas', c.listar);
 r.get('/campanas/:id', c.detalle);
 r.post('/campanas', autorizar('admin'), c.crear);

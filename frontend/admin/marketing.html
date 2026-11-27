@@ -77,12 +77,13 @@
       <div class="kpis">
         <div class="card"><div class="b"><small style="color:var(--muted)">Aceptan WhatsApp</small><span class="cuenta">${fnum(R.clientes.whatsapp)}</span><small style="color:var(--muted)">de ${fnum(R.clientes.total)} clientes</small></div></div>
         <div class="card"><div class="b"><small style="color:var(--muted)">Aceptan correo</small><span class="cuenta">${fnum(R.clientes.correo)}</span><small style="color:var(--muted)">de ${fnum(R.clientes.total)} clientes</small></div></div>
-        <div class="card"><div class="b"><small style="color:var(--muted)">Bolsa de WhatsApp</small><span class="cuenta">${fnum(R.saldo.whatsapp)}</span><small style="color:var(--muted)">${R.whatsappListo ? 'mensajes disponibles' : 'WhatsApp de la empresa no activo'}</small></div></div>
-        <div class="card"><div class="b"><small style="color:var(--muted)">Bolsa de correos</small><span class="cuenta">${fnum(R.saldo.correo)}</span><small style="color:var(--muted)">${R.correoListo ? 'correos disponibles' : 'Correo no configurado en el servidor'}</small></div></div>
+        <div class="card"><div class="b"><small style="color:var(--muted)">Bolsa de WhatsApp</small><span class="cuenta">${fnum(R.saldo.whatsapp)}</span><small style="color:var(--muted)">${R.whatsappListo ? 'mensajes disponibles · no vencen' : 'WhatsApp de la empresa no activo'}</small>${ADM ? '<button class="btn sm p" data-comprar="whatsapp" style="align-self:flex-start;margin-top:6px"><i class="fa-solid fa-cart-shopping"></i> Comprar</button>' : ''}</div></div>
+        <div class="card"><div class="b"><small style="color:var(--muted)">Bolsa de correos</small><span class="cuenta">${fnum(R.saldo.correo)}</span><small style="color:var(--muted)">${R.correoListo ? 'correos disponibles · no vencen' : 'Correo no configurado en el servidor'}</small>${ADM ? '<button class="btn sm p" data-comprar="correo" style="align-self:flex-start;margin-top:6px"><i class="fa-solid fa-cart-shopping"></i> Comprar</button>' : ''}</div></div>
       </div>
       <div class="tabs" id="tabs"><button data-t="promo"><i class="fa-solid fa-bolt"></i> Promoción del día</button><button data-t="campanas">Campañas</button><button data-t="plantillas">Plantillas de WhatsApp</button><button data-t="ajustes">Ajustes</button></div>
       <div id="cont"></div>`;
     $('nueva') && ($('nueva').onclick = () => editar());
+    main.querySelectorAll('[data-comprar]').forEach(b => { b.onclick = () => POS.comprarBolsa(b.dataset.comprar); });
     $('tabs').onclick = e => { const b = e.target.closest('[data-t]'); if (b) { pestaña = b.dataset.t; ver(); } };
     ver();
   }
@@ -171,11 +172,38 @@
     });
   }
 
-  function nuevaPlantilla() {
-    const m = modal({ titulo: 'Nueva plantilla de WhatsApp', html: `<div class="grid"><div class="f" style="grid-column:span 12"><label>Nombre interno</label><input class="in" id="pn" placeholder="promo_fin_de_semana"></div><div class="f" style="grid-column:span 12"><label>Texto del mensaje</label><textarea class="in" id="pc" style="min-height:120px" placeholder="Hola {nombre}, este fin de semana tenemos 20% de descuento en frutas y verduras. ¡Te esperamos!"></textarea><small>Usa {nombre} para el nombre del cliente. Si no lo incluyes, se agrega al final "Responde BAJA para no recibir más promociones". Evita textos engañosos o en mayúsculas: Meta puede rechazarla.</small></div><div class="f" style="grid-column:span 12"><label>Vista previa</label><div class="vista" id="pv"></div></div></div>`, pie: '<button class="btn p" data-s>Enviar a aprobación</button>' });
-    const pv = () => { const t = m.q('#pc').value.trim(); m.q('#pv').textContent = (t || '…').replace(/\{nombre\}/gi, 'Valentina') + (/BAJA/i.test(t) ? '' : '\n\nResponde BAJA para no recibir más promociones.'); };
-    m.q('#pc').oninput = pv; pv();
-    m.q('[data-s]').onclick = async () => { if (await datos('/marketing/plantillas', 'POST', { nombre: m.q('#pn').value, cuerpo: m.q('#pc').value })) { m.cerrar(); toast('Plantilla enviada a aprobación'); ver(); } };
+  // Nueva plantilla: ejemplos, recomendaciones de Meta y revisión en vivo (la misma que aplica el servidor)
+  async function nuevaPlantilla() {
+    const A = await datos('/marketing/plantillas/ayuda'); if (!A) return;
+    const m = modal({ clase: 'l', titulo: 'Nueva plantilla de WhatsApp', html: `<div class="ed-correo">
+      <div>
+        <div class="f"><label>Empieza con un ejemplo (tócalo para usarlo)</label><div class="chips" id="ejs">${A.ejemplos.map((x, i) => `<button type="button" class="chip" data-e="${i}">${esc(x.titulo)}</button>`).join('')}</div></div>
+        <div class="f" style="margin-top:10px"><label>Nombre interno</label><input class="in" id="pn" placeholder="oferta_fin_de_semana"><small>Solo lo ves tú. Minúsculas y guiones bajos.</small></div>
+        <div class="f" style="margin-top:10px"><label>Texto del mensaje</label><textarea class="in" id="pc" style="min-height:150px" placeholder="Hola {nombre}, este fin de semana en {negocio} tienes 20% de descuento en frutas y verduras. Válido hasta el domingo. Pide por este chat."></textarea><small>{nombre} = nombre del cliente · {negocio} = ${esc(A.negocio)}</small></div>
+        <div id="rev" style="margin-top:10px"></div>
+      </div>
+      <div>
+        <label style="font-size:12px;font-weight:600;color:var(--muted)">Así lo verá tu cliente</label><div class="vista" id="pv" style="margin:6px 0 14px">…</div>
+        <div class="card"><div class="b"><b style="font-size:13px"><i class="fa-solid fa-circle-check" style="color:var(--success)"></i> Para que Meta la apruebe</b><ul style="margin:6px 0 0;padding-left:18px;font-size:12.5px;line-height:1.6;color:var(--muted)">${A.recomendaciones.map(r => `<li>${esc(r)}</li>`).join('')}</ul></div></div>
+      </div>
+    </div>`, pie: '<button class="btn p" data-s>Enviar a aprobación</button>' });
+    let ultimo = null;
+    const revisar = debounce(async () => {
+      const t = m.q('#pc').value;
+      if (!t.trim()) { m.q('#pv').textContent = '…'; m.q('#rev').innerHTML = ''; ultimo = null; return; }
+      const r = await api('/marketing/plantillas/revisar', 'POST', { cuerpo: t }); if (!r.success) return;
+      ultimo = r.data; m.q('#pv').textContent = r.data.vista;
+      m.q('#rev').innerHTML = r.data.errores.map(x => `<div class="aviso m" style="margin-bottom:6px"><i class="fa-solid fa-circle-xmark"></i><span>${esc(x)}</span></div>`).join('')
+        + r.data.avisos.map(x => `<div class="aviso a" style="margin-bottom:6px"><i class="fa-solid fa-lightbulb"></i><span>${esc(x)}</span></div>`).join('')
+        + (!r.data.errores.length && !r.data.avisos.length ? '<div class="aviso b"><i class="fa-solid fa-circle-check"></i><span>¡Se ve bien! Lista para enviar a aprobación.</span></div>' : '');
+      m.q('[data-s]').disabled = r.data.errores.length > 0;
+    }, 300);
+    m.q('#pc').oninput = revisar;
+    m.q('#ejs').onclick = e => { const b = e.target.closest('[data-e]'); if (!b) return; const x = A.ejemplos[b.dataset.e]; m.q('#pc').value = x.texto.replace(new RegExp(A.negocio.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'g'), '{negocio}'); if (!m.q('#pn').value) m.q('#pn').value = x.nombre; revisar(); };
+    m.q('[data-s]').onclick = async () => {
+      if (ultimo?.avisos.length && !(await confirmar('Hay recomendaciones sin resolver', 'Meta podría rechazar la plantilla o tardar más en aprobarla. ¿La envías así?', 'Enviar así'))) return;
+      if (await datos('/marketing/plantillas', 'POST', { nombre: m.q('#pn').value, cuerpo: m.q('#pc').value })) { m.cerrar(); toast('Plantilla enviada a aprobación de Meta'); ver(); }
+    };
   }
 
   // ── Editor de bloques del correo ──

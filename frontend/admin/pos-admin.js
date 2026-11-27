@@ -203,6 +203,24 @@
     b.innerHTML = `<i class="fa-solid ${dias ? 'fa-hourglass-half' : 'fa-lock'}"></i><span>${dias ? `Te ${dias === 1 ? 'queda <b>1 día</b>' : `quedan <b>${dias} días</b>`} de prueba gratis con todo el plan.` : '<b>Tu prueba gratis terminó.</b> Tus datos están guardados: elige un plan para seguir vendiendo.'}</span>${admin && pag !== 'suscripcion' ? '<a class="btn sm p" href="suscripcion.html">Elegir mi plan</a>' : ''}`;
     main.before(b);
   }
+  // Compra de bolsas de mensajes para marketing (pago único con Stripe; el saldo no vence)
+  POS.comprarBolsa = async function (canal) {
+    const d = await datos('/cuenta/bolsas'); if (!d) return;
+    const fmt = (n, m) => `${m === 'USD' ? 'US$' : '$'}${Number(n).toLocaleString(m === 'COP' ? 'es-CO' : 'en-US', { maximumFractionDigits: 2 })} ${m}`;
+    const lista = d.paquetes.filter(p => !canal || p.canal === canal);
+    const grupo = c => { const l = lista.filter(p => p.canal === c); return l.length ? `<div class="sec" style="margin:10px 0 6px"><i class="fa-${c === 'whatsapp' ? 'brands fa-whatsapp' : 'solid fa-envelope'}"></i> ${c === 'whatsapp' ? 'WhatsApp' : 'Correo'} <small style="color:var(--muted);font-weight:500">· saldo actual ${fnum(d.saldo[c])}</small></div>${l.map(p => `<div style="display:flex;justify-content:space-between;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid var(--border)"><span><b>${fnum(p.cantidad)} ${c === 'whatsapp' ? 'mensajes' : 'correos'}</b><small style="display:block;color:var(--muted)">${fmt(p.porMensaje, p.moneda)} por mensaje</small></span><button class="btn p sm" data-c="${c}" data-n="${p.cantidad}">Comprar · ${fmt(p.precio, p.moneda)}</button></div>`).join('')}` : ''; };
+    const m = modal({ titulo: 'Comprar mensajes para marketing', html: lista.length
+      ? `<p style="color:var(--muted);font-size:13px;margin:0 0 4px">Pagas una sola vez con tarjeta en Stripe y el saldo se suma al instante. <b>Los mensajes no vencen:</b> los usas cuando quieras en tus campañas.</p>${grupo('whatsapp')}${grupo('correo')}${d.modoPrueba ? '<p style="color:var(--warning);font-size:12.5px;margin-top:10px">Pagos en modo de prueba: usa la tarjeta 4242 4242 4242 4242.</p>' : ''}`
+      : '<div class="nada"><i class="fa-solid fa-box-open"></i>Aún no hay paquetes disponibles para tu país. Escríbele al equipo de Katú.</div>',
+      pie: '<button class="btn" data-x>Cerrar</button>' });
+    m.el.addEventListener('click', async e => {
+      const b = e.target.closest('[data-n]'); if (!b) return;
+      if (!d.pagosDisponibles) return toast('Los pagos no están disponibles en este momento', 'mal');
+      b.disabled = true; b.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Preparando el pago…';
+      const r = await datos('/cuenta/bolsas/comprar', 'POST', { canal: b.dataset.c, cantidad: Number(b.dataset.n) });
+      if (r?.url) location.href = r.url; else { b.disabled = false; b.textContent = 'Comprar'; }
+    });
+  };
   POS.listo = (async () => {
     const [c, e] = await Promise.all([api('/configuracion'), ES_SUPER ? api('/empresas') : { data: [] }]);
     if (c.success) { POS.empresa = c.data.empresa; POS.pais = c.data.pais; POS.medios = c.data.medios || []; POS.modoDemo = c.data.modoDemo; }

@@ -30,6 +30,12 @@ const paisSchema = new mongoose.Schema({
     entidad:         { type: String, default: '' },
     codigoUnico:     { type: String, default: '' },
   },
+  // Bolsas de mensajes para marketing que los comercios del país compran con Stripe.
+  // Las cantidades son múltiplos de 1.000; los precios los define Katú en Admin → Países.
+  bolsas: {
+    moneda:   { type: String, default: 'USD', uppercase: true, trim: true },
+    paquetes: [{ _id: false, canal: { type: String, enum: ['whatsapp', 'correo'] }, cantidad: Number, precio: Number }],
+  },
   activo: { type: Boolean, default: true },
 }, { timestamps: true });
 

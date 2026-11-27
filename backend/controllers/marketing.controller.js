@@ -4,6 +4,7 @@ const Campana = require('../models/Campana');
 const EnvioCampana = require('../models/EnvioCampana');
 const mk = require('../utils/marketing');
 const promo = require('../utils/promoDia');
+const plantillasWa = require('../utils/plantillasWa');
 const diseno = require('../utils/correoDiseno');
 const wa = require('../utils/whatsapp');
 const correo = require('../utils/correo/sendgrid');
@@ -41,7 +42,6 @@ exports.segmento = manejar(async req => {
 });
 
 // ── Plantillas de WhatsApp (aprobación de Meta) ────────────────────────────
-const PIE = 'Responde BAJA para no recibir más promociones.';
 exports.plantillas = manejar(async req => {
   const e = await Empresa.findById(req.empresa._id).lean();
   const ps = e.whatsapp?.plantillasMarketing || [];
@@ -56,18 +56,25 @@ exports.crearPlantilla = manejar(async (req, res) => {
   const e = await Empresa.findById(req.empresa._id).lean();
   if (!e.whatsapp?.subcuentaSid) throw new ErrorApi('Primero hay que activar el WhatsApp de la empresa');
   const nombre = String(req.body.nombre || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^a-z0-9]+/g, '_').replace(/^_|_$/g, '').slice(0, 60);
-  let cuerpo = String(req.body.cuerpo || '').trim();
-  if (!nombre || cuerpo.length < 10) throw new ErrorApi('Escribe un nombre y el texto de la plantilla');
-  if (cuerpo.length > 900) throw new ErrorApi('El texto es muy largo (máximo 900 caracteres)');
+  if (!nombre) throw new ErrorApi('Ponle un nombre interno a la plantilla');
+  // Lo que Meta rechaza siempre no se envía (empezar o terminar con variable, acortadores…)
+  const rv = plantillasWa.revisar(req.body.cuerpo, { negocio: e.nombre });
+  if (rv.errores.length) throw new ErrorApi(rv.errores[0]);
   if ((e.whatsapp.plantillasMarketing || []).some(p => p.nombre === nombre)) throw new ErrorApi('Ya existe una plantilla con ese nombre', 409);
-  cuerpo = cuerpo.replace(/\{nombre\}/gi, '{{1}}');
-  if (!/BAJA/i.test(cuerpo)) cuerpo += `\n\n${PIE}`; // Meta y la ley exigen una forma clara de darse de baja
+  const cuerpo = rv.cuerpo; // con {{1}} y la forma de darse de baja (la exigen Meta y la ley)
   const r = await wa.twilio.crearPlantilla(e.whatsapp.subcuentaSid, { nombre, cuerpo });
   const estado = wa.twilio.simulado() ? 'aprobada' : 'pendiente';
   await Empresa.updateOne({ _id: e._id }, { $push: { 'whatsapp.plantillasMarketing': { nombre, cuerpo, contentSid: r.contentSid, estado } } });
   res.status(201);
   return { nombre, cuerpo, contentSid: r.contentSid, estado };
 });
+
+// Ayuda para crear plantillas: ejemplos, recomendaciones y revisión en vivo
+exports.ayudaPlantilla = manejar(async req => {
+  const negocio = req.empresa.nombre;
+  return { ejemplos: plantillasWa.EJEMPLOS.map(x => ({ ...x, texto: x.texto.replace(/\{negocio\}/g, negocio) })), recomendaciones: plantillasWa.RECOMENDACIONES, negocio };
+});
+exports.revisarPlantilla = manejar(async req => plantillasWa.revisar(req.body.cuerpo, { negocio: req.empresa.nombre }));
 
 // ── Campañas ───────────────────────────────────────────────────────────────
 exports.listar = manejar(async req => (await Campana.find({ empresa: req.empresa._id }).populate('creadaPor', 'nombre').sort({ createdAt: -1 }).limit(200).lean()).map(vistaCampana));

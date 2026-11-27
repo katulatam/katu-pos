@@ -26,6 +26,12 @@ r.post('/suscripcion/portal', requiereEmpresa, autorizar('admin'), manejar(req =
 r.post('/suscripcion/checkout', requiereEmpresa, autorizar('admin'), manejar(req => sus.checkoutEmpresa(req.empresa, req.body)));
 r.post('/suscripcion/confirmar', requiereEmpresa, autorizar('admin'), manejar(req => sus.confirmarPago(req.empresa, req.body.sesion)));
 
+// Bolsas de mensajes de marketing: paquetes del país y compra con Stripe
+const bolsas = require('../utils/bolsas');
+r.get('/bolsas', requiereEmpresa, autorizar('admin', 'supervisor'), manejar(req => bolsas.catalogo(req.empresa)));
+r.post('/bolsas/comprar', requiereEmpresa, autorizar('admin'), manejar(req => bolsas.comprar(req.empresa, req.usuario._id, req.body)));
+r.post('/bolsas/confirmar', requiereEmpresa, autorizar('admin'), manejar(req => bolsas.confirmar(req.empresa, req.body.sesion)));
+
 // Equipo Katú: planes y registros de la landing
 const CAMPOS = ['nombre', 'descripcion', 'moneda', 'precioMensual', 'precioAnual', 'modulos', 'caracteristicas', 'destacado', 'diasPrueba', 'orden', 'activo'];
 const tomar = b => {
