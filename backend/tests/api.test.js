@@ -3,6 +3,7 @@ process.env.JWT_SECRET = 'prueba';
 process.env.MODO_DEMO = 'true';
 process.env.KATU_ADMIN_PASSWORD = 'SuperPrueba1';
 process.env.ALANUBE_TOKEN = 'token-prueba';
+process.env.PUBLIC_URL = 'https://app.katupos.test'; // las pruebas no dependen del .env local
 ['MONGO_URI', 'DB_HOST', 'TWILIO_ACCOUNT_SID', 'TWILIO_AUTH_TOKEN', 'OPENROUTER_API_KEY', 'SENDGRID_API_KEY', 'STRIPE_SECRET_KEY', 'STRIPE_WEBHOOK_SECRET', 'DOMINIO_BASE'].forEach(k => { process.env[k] = ''; }); // nunca servicios reales en pruebas
 
 const test = require('node:test');

@@ -1,5 +1,5 @@
 # Imagen de producción — Katú POS (multiempresa, un solo contenedor)
-FROM node:20-alpine
+FROM node:22-alpine
 
 WORKDIR /app
 
