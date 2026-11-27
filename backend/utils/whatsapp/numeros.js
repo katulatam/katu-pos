@@ -145,7 +145,7 @@ async function verificar(numeroId, usuario) {
   if (!n || !n.empresa) throw new ErrorApi('Número no asignado', 404);
   if (n.estado === 'activo') return { activo: true, numero: n.numero };
   const e = await Empresa.findById(n.empresa).lean();
-  if (!(await twilio.verificarNumero(e.whatsapp.subcuentaSid, e.whatsapp.servicioSid, n.numero).catch(() => false))) return { activo: false, numero: n.numero };
+  if (!(await twilio.esRemitenteWhatsapp(e.whatsapp.subcuentaSid, e.whatsapp.servicioSid, n.numero).catch(() => false))) return { activo: false, numero: n.numero };
   if (await Empresa.exists({ _id: { $ne: e._id }, 'whatsapp.numero': n.numero })) throw new ErrorApi('Ese número ya está activo en otra empresa', 409);
   const r = await NumeroWhatsapp.updateOne({ _id: n._id, estado: 'asignado' }, { estado: 'activo', activadoEn: new Date(), $push: { historial: nota('activado', e._id, usuario) } });
   if (!r.modifiedCount) return { activo: true, numero: n.numero }; // otro proceso ya lo activó

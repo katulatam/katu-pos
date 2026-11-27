@@ -55,6 +55,7 @@
         <li>En <b>console.twilio.com</b> cambia a la subcuenta <b>${esc(g.subcuenta)}</b>.</li>
         <li>Ve a <b>Messaging → Senders → WhatsApp senders</b> y registra el número <b>${esc(g.numero)}</b> con la cuenta de empresa de Katú en Meta. Como el número es de Twilio, la verificación por código es automática.</li>
         <li>Completa el perfil con los datos de abajo (nombre visible, descripción, sitio web, dirección, logo).</li>
+        <li>Cuando el remitente quede <b>Online</b>, agrégalo al servicio de mensajes: <b>Messaging → Services → WhatsApp ${esc(g.nombreVisible)} → Sender Pool → Add Senders → WhatsApp Number</b>. Katú POS solo lo activa cuando el remitente de WhatsApp está en ese servicio.</li>
         <li>Cuando Meta lo apruebe, Katú POS lo activa solo en unos minutos, crea las plantillas de avisos y le escribe al cliente "Tu WhatsApp está listo". También puedes tocar <b>Verificar</b>.</li>
       </ol>
       ${fila('Número', g.numero)}${fila('Nombre visible', g.nombreVisible)}${fila('Descripción', g.descripcion)}${fila('Sitio web', g.sitioWeb)}${fila('Dirección', g.direccion)}${fila('Correo', g.correo)}${fila('Logo (URL)', g.logo)}${fila('Subcuenta (SID)', g.subcuentaSid)}`,

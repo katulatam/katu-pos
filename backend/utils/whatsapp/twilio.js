@@ -64,6 +64,15 @@ async function verificarNumero(subSid, servicioSid, numero) {
   return lista.includes(numero);
 }
 
+// Más estricto: el número ya es REMITENTE DE WHATSAPP en el servicio (no basta con
+// que el número de teléfono esté agregado). Lo usa la activación de los números de Katú.
+async function esRemitenteWhatsapp(subSid, servicioSid, numero) {
+  if (simulado()) return true;
+  const cred = await credSub(subSid);
+  const s = await llamar(cred, 'get', `${MSG}/Services/${servicioSid}/ChannelSenders?PageSize=50`).catch(() => null);
+  return (s?.senders || []).some(x => String(x.sender || '') === `whatsapp:${numero}`);
+}
+
 async function enviar({ subcuentaSid, servicioSid, numero }, { a, texto, plantilla, variables, aviso }) {
   if (simulado()) return { sid: 'SMsim' + crypto.randomBytes(15).toString('hex'), estado: 'entregado' };
   const cred = await credSub(subcuentaSid);
@@ -167,5 +176,5 @@ async function estadoPlantilla(subSid, contentSid) {
   return { estado: s === 'approved' ? 'aprobada' : ['rejected', 'paused', 'disabled'].includes(s) ? 'rechazada' : 'pendiente', motivo: r?.whatsapp?.rejection_reason || '' };
 }
 
-module.exports = { disponible, simulado, crearSubcuenta, verificarNumero, enviar, firmaValida, descargar, crearPlantilla, estadoPlantilla,
+module.exports = { disponible, simulado, crearSubcuenta, verificarNumero, esRemitenteWhatsapp, enviar, firmaValida, descargar, crearPlantilla, estadoPlantilla,
   buscarNumeros, comprarNumero, buscarComprado, moverNumero, agregarAServicio, quitarDeServicio, darDeBaja, sidMaestra, ErrorTwilio };
