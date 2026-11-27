@@ -1,0 +1,5 @@
+User-agent: *
+Allow: /
+Disallow: /bienvenida.html
+
+Sitemap: https://www.katupos.com/sitemap.xml

@@ -104,7 +104,7 @@
 
   // ── Planes ──
   const EJEMPLO = [
-    { codigo: 'basico', nombre: 'Básico', descripcion: 'Para empezar a vender rápido y en regla.', moneda: 'USD', precioMensual: 29, precioAnual: 290, caracteristicas: ['POS rápido con lector y báscula', 'Inventario, compras y vencimientos', 'Factura electrónica (según tu país)', 'Fiado y cartera de clientes', 'Informes y arqueos de turno', 'Funciona sin internet'] },
+    { codigo: 'basico', nombre: 'Básico', descripcion: 'Para empezar a vender rápido y en regla.', moneda: 'USD', precioMensual: 29, precioAnual: 290, caracteristicas: ['POS rápido con lector y báscula', 'Inventario, compras y vencimientos', 'Factura electrónica (según tu país)', 'Fiado y cartera de clientes', 'Informes con IA y arqueos de turno', 'Funciona sin internet'] },
     { codigo: 'pro', nombre: 'Pro', destacado: true, descripcion: 'Vende también a domicilio y por WhatsApp.', moneda: 'USD', precioMensual: 59, precioAnual: 590, caracteristicas: ['Todo lo del plan Básico', 'Tienda en línea con tu subdominio', 'Domicilios con seguimiento y PIN', 'WhatsApp con asistente de IA y asesores', 'Puntos, niveles y misiones para clientes'] },
     { codigo: 'premium', nombre: 'Premium', descripcion: 'La experiencia completa para crecer.', moneda: 'USD', precioMensual: 99, precioAnual: 990, caracteristicas: ['Todo lo del plan Pro', 'Software de autopago (el kiosco se cotiza aparte)', 'Campañas por WhatsApp y correo', 'Ventas atribuidas a cada campaña', 'Soporte prioritario'] },
   ];

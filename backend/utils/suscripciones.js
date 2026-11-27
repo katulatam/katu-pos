@@ -24,7 +24,7 @@ const limpio = s => String(s ?? '').replace(/[<>&"]/g, c => ({ '<': '&lt;', '>':
 const PLANES_EJEMPLO = [
   { codigo: 'basico', nombre: 'Básico', orden: 1, moneda: 'USD', precioMensual: 29, precioAnual: 290, descripcion: 'Para empezar a vender rápido y en regla.',
     modulos: { facturacion: true, fiado: true, domicilios: false, gamificacion: false, kiosco: false, whatsapp: false, marketing: false },
-    caracteristicas: ['POS rápido con lector y báscula', 'Inventario, compras y vencimientos', 'Factura electrónica (según tu país)', 'Fiado y cartera de clientes', 'Informes y arqueos de turno', 'Funciona sin internet'] },
+    caracteristicas: ['POS rápido con lector y báscula', 'Inventario, compras y vencimientos', 'Factura electrónica (según tu país)', 'Fiado y cartera de clientes', 'Informes con IA y arqueos de turno', 'Funciona sin internet'] },
   { codigo: 'pro', nombre: 'Pro', orden: 2, destacado: true, moneda: 'USD', precioMensual: 59, precioAnual: 590, descripcion: 'Vende también a domicilio y por WhatsApp.',
     modulos: { facturacion: true, fiado: true, domicilios: true, gamificacion: true, kiosco: false, whatsapp: true, marketing: false },
     caracteristicas: ['Todo lo del plan Básico', 'Tienda en línea con tu subdominio', 'Domicilios con seguimiento y PIN', 'WhatsApp con asistente de IA y asesores', 'Puntos, niveles y misiones para clientes'] },

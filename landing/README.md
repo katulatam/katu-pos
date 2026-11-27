@@ -18,6 +18,7 @@ Sitio estático (HTML, CSS y JS, sin compilación). Se sube tal cual al balancea
 - **Registro**: valida el subdominio en vivo, crea el registro y redirige al Checkout de Stripe.
 - **Enlace directo a un plan**: `https://www.katupos.com/#plan-pro` abre el registro con ese plan.
 - **Al publicar cambios** de `estilos.css`, `app.js` o `config.js`, sube el número `?v=` en `index.html` y `bienvenida.html`: así los navegadores no usan la versión vieja guardada en caché.
+- **Buscadores (SEO)**: título, descripción, canónica, Open Graph y datos estructurados (Organization, WebSite, SoftwareApplication, FAQPage) en `index.html`; guías en carpetas (`/sistema-pos/`, `/pos-para-minimercados/`, `/pos-con-inteligencia-artificial/`, `/pos-con-whatsapp/`, `/software-pos-colombia/`) con Article, BreadcrumbList y FAQPage; `robots.txt` y `sitemap.xml`. Al agregar una guía, súmala al sitemap y al pie. Pendiente: imagen para redes de 1200×630 (`img/og.jpg`) y alta en Google Search Console.
 - **Revisar textos antes de publicar**: las promesas comerciales (por ejemplo "soporte prioritario", "factura incluida en todos los planes", "copias de seguridad diarias") deben coincidir con lo que Katú ofrece.
 
 Para verla en local: sirve la carpeta con cualquier servidor estático y cambia `API` en `config.js` a `http://localhost:3008/api/v1`.
