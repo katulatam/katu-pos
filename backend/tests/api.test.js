@@ -344,6 +344,7 @@ test('aislamiento entre empresas, países y roles', async () => {
   const paises = ok(await api('super', 'GET', '/paises')).paises;
   const co = paises.find(p => p.codigo === 'CO');
   no(await api('super', 'PUT', '/paises/' + co._id, { decimales: 2 }), 409);
+  no(await api('super', 'PUT', '/paises/' + paises.find(p => p.codigo === 'MX')._id, { facturacion: { proveedor: '', ofrecida: true } }), 400);
   ok(await api('super', 'PUT', '/paises/' + paises.find(p => p.codigo === 'CL')._id, { redondeoEfectivo: 10 }));
   const e = ok(await api('super', 'POST', '/empresas', { nombre: 'tienda lima', slug: 'tienda-lima', pais: 'PE', admin: { nombre: 'ana', correo: 'ana@lima.demo', password: 'Segura123' } }));
   assert.deepEqual([e.zonaHoraria, e.nombre], ['America/Lima', 'Tienda Lima']);
@@ -589,6 +590,10 @@ test('suscripción: landing → Stripe → alta automática, subdominio, mora, s
   try {
     const { planes, modoPrueba } = ok(await api('', 'GET', '/registro/planes'));
     assert.deepEqual(planes.map(p => p.codigo), ['basico', 'pro', 'premium']); assert.equal(modoPrueba, true);
+    // Países del registro: la facturación electrónica solo donde Katú la ofrece
+    const ps = ok(await api('', 'GET', '/registro/paises'));
+    assert.equal(ps.find(p => p.codigo === 'CO').facturacion.ofrecida, true);
+    assert.equal(ps.find(p => p.codigo === 'MX').facturacion.ofrecida, false);
     assert.equal(ok(await api('', 'GET', '/registro/subdominio/orbita')).disponible, false);
     assert.equal(ok(await api('', 'GET', '/registro/subdominio/www')).disponible, false);
     assert.deepEqual(ok(await api('', 'GET', '/registro/subdominio/' + encodeURIComponent('Mi Tiénda'))), { subdominio: 'mi-tienda', disponible: true });
@@ -599,7 +604,7 @@ test('suscripción: landing → Stripe → alta automática, subdominio, mora, s
     const ck = ok(await api('', 'POST', '/registro/checkout', datos));
     assert.equal(ck.url, 'https://checkout.stripe.test/cs_test_1');
     const p = recibidosStripe.find(r => r.u === '/checkout/sessions').body;
-    assert.deepEqual([p.get('mode'), p.get('line_items[0][price_data][unit_amount]'), p.get('line_items[0][price_data][recurring][interval]'), p.get('metadata[registro]')], ['subscription', String(1790000 * 100), 'year', String(ck.registro)]);
+    assert.deepEqual([p.get('mode'), p.get('line_items[0][price_data][unit_amount]'), p.get('line_items[0][price_data][recurring][interval]'), p.get('metadata[registro]')], ['subscription', String(590 * 100), 'year', String(ck.registro)]);
     assert.equal(ok(await api('', 'GET', '/registro/subdominio/mi-tienda')).disponible, false, 'reservado mientras paga');
     assert.equal(ok(await api('', 'GET', '/registro/estado/' + ck.registro)).estado, 'pendiente');
 

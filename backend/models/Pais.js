@@ -23,6 +23,9 @@ const paisSchema = new mongoose.Schema({
   mediosPago: [{ _id: false, codigo: String, nombre: String, tipo: { type: String }, proveedor: String, icono: String }],
   facturacion: {
     proveedor:       { type: String, default: '' },    // '' = el país no emite facturación electrónica desde Katú
+    // Decisión comercial de Katú: se activa a las empresas nuevas del país y se anuncia en la
+    // landing. Requiere proveedor. Apagarlo no corta a las empresas que ya facturan.
+    ofrecida:        { type: Boolean, default: false },
     nombreDocumento: { type: String, default: 'Factura' },
     entidad:         { type: String, default: '' },
     codigoUnico:     { type: String, default: '' },

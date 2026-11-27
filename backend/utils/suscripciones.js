@@ -5,6 +5,8 @@ const empresas = require('./empresas');
 const stripe = require('./pagos/stripe');
 const correo = require('./correo/sendgrid');
 const { ErrorApi, paisPorCodigo } = require('./contexto');
+const Pais = require('../models/Pais');
+const { proveedorDe } = require('./facturacion');
 
 // ── Suscripciones: planes, alta automática y ciclo de cobro con Stripe ─────
 // Landing → Checkout de Stripe → webhook "checkout.session.completed" → se crea
@@ -17,13 +19,13 @@ const MODULOS = ['facturacion', 'domicilios', 'gamificacion', 'fiado', 'kiosco',
 
 // Planes de ejemplo (precios editables en Admin > Planes)
 const PLANES_EJEMPLO = [
-  { codigo: 'basico', nombre: 'Básico', orden: 1, moneda: 'COP', precioMensual: 89000, precioAnual: 890000, descripcion: 'Para empezar a vender rápido y en regla.',
+  { codigo: 'basico', nombre: 'Básico', orden: 1, moneda: 'USD', precioMensual: 29, precioAnual: 290, descripcion: 'Para empezar a vender rápido y en regla.',
     modulos: { facturacion: true, fiado: true, domicilios: false, gamificacion: false, kiosco: false, whatsapp: false, marketing: false },
-    caracteristicas: ['Caja rápida con lector y báscula', 'Inventario, compras y vencimientos', 'Factura electrónica DIAN', 'Fiado y cartera de clientes', 'Informes y arqueos de turno', 'Funciona sin internet'] },
-  { codigo: 'pro', nombre: 'Pro', orden: 2, destacado: true, moneda: 'COP', precioMensual: 179000, precioAnual: 1790000, descripcion: 'Vende también a domicilio y por WhatsApp.',
+    caracteristicas: ['Caja rápida con lector y báscula', 'Inventario, compras y vencimientos', 'Factura electrónica (según tu país)', 'Fiado y cartera de clientes', 'Informes y arqueos de turno', 'Funciona sin internet'] },
+  { codigo: 'pro', nombre: 'Pro', orden: 2, destacado: true, moneda: 'USD', precioMensual: 59, precioAnual: 590, descripcion: 'Vende también a domicilio y por WhatsApp.',
     modulos: { facturacion: true, fiado: true, domicilios: true, gamificacion: true, kiosco: false, whatsapp: true, marketing: false },
     caracteristicas: ['Todo lo del plan Básico', 'Tienda en línea con tu subdominio', 'Domicilios con seguimiento y PIN', 'WhatsApp con asistente de IA y asesores', 'Puntos, niveles y misiones para clientes'] },
-  { codigo: 'premium', nombre: 'Premium', orden: 3, moneda: 'COP', precioMensual: 299000, precioAnual: 2990000, descripcion: 'La experiencia completa para crecer.',
+  { codigo: 'premium', nombre: 'Premium', orden: 3, moneda: 'USD', precioMensual: 99, precioAnual: 990, descripcion: 'La experiencia completa para crecer.',
     modulos: { facturacion: true, fiado: true, domicilios: true, gamificacion: true, kiosco: true, whatsapp: true, marketing: true },
     caracteristicas: ['Todo lo del plan Pro', 'Kiosco de autopago', 'Campañas por WhatsApp y correo', 'Ventas atribuidas a cada campaña', 'Soporte prioritario'] },
 ];
@@ -33,6 +35,12 @@ async function sembrarPlanes() {
 }
 const planPublico = p => ({ codigo: p.codigo, nombre: p.nombre, descripcion: p.descripcion, moneda: p.moneda, precioMensual: p.precioMensual, precioAnual: p.precioAnual, caracteristicas: p.caracteristicas, destacado: !!p.destacado, diasPrueba: p.diasPrueba || 0, modulos: p.modulos });
 const planesActivos = async () => (await Plan.find({ activo: true }).sort({ orden: 1 }).lean()).map(planPublico);
+// Países donde alguien se puede registrar y si allí Katú ofrece la facturación electrónica
+const ofreceFacturacion = p => !!(p?.facturacion?.ofrecida && proveedorDe(p));
+const paisesRegistro = async () => (await Pais.find({ activo: true }).sort({ nombre: 1 }).lean()).map(p => ({
+  codigo: p.codigo, nombre: p.nombre, moneda: p.moneda, zonasHorarias: p.zonasHorarias || [],
+  facturacion: { ofrecida: ofreceFacturacion(p), nombreDocumento: p.facturacion?.nombreDocumento || '', entidad: p.facturacion?.entidad || '' },
+}));
 
 // ── Registro desde la landing ──────────────────────────────────────────────
 async function subdominioDisponible(s) {
@@ -119,13 +127,14 @@ async function provisionar(registroId, { cliente, suscripcion } = {}) {
   const reg = await Registro.findOneAndUpdate({ _id: registroId, estado: { $in: ['pendiente', 'vencido'] } }, { estado: 'pagado', stripeCliente: cliente, stripeSuscripcion: suscripcion }, { new: true }).lean();
   if (!reg) return Registro.findById(registroId).lean();
   try {
-    const plan = await Plan.findOne({ codigo: reg.plan }).lean();
+    const [plan, pais] = await Promise.all([Plan.findOne({ codigo: reg.plan }).lean(), paisPorCodigo(reg.pais).catch(() => null)]);
     // Si el subdominio se ocupó mientras pagaba, se busca uno libre
     let slug = reg.subdominio;
     for (let i = 2; await Empresa.exists({ slug }); i++) slug = `${reg.subdominio.slice(0, 36)}-${i}`;
     const { empresa, usuario } = await empresas.crearEmpresa({
       nombre: reg.negocio, slug, pais: reg.pais, correo: reg.correo, telefono: reg.telefono,
-      modulos: Object.fromEntries(MODULOS.map(k => [k, !!plan?.modulos?.[k]])),
+      // La facturación del plan solo se activa si Katú la ofrece en el país del negocio
+      modulos: Object.fromEntries(MODULOS.map(k => [k, !!plan?.modulos?.[k] && (k !== 'facturacion' || ofreceFacturacion(pais))])),
       suscripcion: { plan: reg.plan, periodo: reg.periodo, estado: plan?.diasPrueba > 0 ? 'prueba' : 'activa', stripeCliente: cliente, stripeSuscripcion: suscripcion },
     }, { admin: { nombre: reg.nombre, correo: reg.correo, telefono: reg.telefono } });
     // Stripe no garantiza el orden de los eventos: invoice.paid puede llegar antes que este.
@@ -194,4 +203,4 @@ async function portal(empresa) {
   return { url: s.url };
 }
 
-module.exports = { reenviarBienvenida, PLANES_EJEMPLO, MODULOS, sembrarPlanes, planesActivos, planPublico, subdominioDisponible, iniciar, estadoRegistro, provisionar, procesarEvento, suspenderVencidas, portal, DIAS_GRACIA };
+module.exports = { reenviarBienvenida, PLANES_EJEMPLO, MODULOS, sembrarPlanes, planesActivos, planPublico, paisesRegistro, ofreceFacturacion, subdominioDisponible, iniciar, estadoRegistro, provisionar, procesarEvento, suspenderVencidas, portal, DIAS_GRACIA };

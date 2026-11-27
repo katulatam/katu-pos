@@ -6,7 +6,15 @@
   const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
   const quieto = matchMedia('(prefers-reduced-motion: reduce)').matches;
   const dormir = ms => new Promise(r => setTimeout(r, ms));
-  const plata = (n, m = 'COP') => (m === 'USD' ? 'US$' : '$') + Number(n || 0).toLocaleString('es-CO', { maximumFractionDigits: m === 'COP' ? 0 : 2 });
+  // Dinero en cualquier moneda ISO: símbolo + cifra (entera sin decimales); el código va aparte
+  const SIMBOLO = { USD: '$', COP: '$', MXN: '$', CLP: '$', EUR: '€', PEN: 'S/', GTQ: 'Q' };
+  const cifra = (n, m = 'USD') => {
+    const v = Number(n || 0), dec = Number.isInteger(v) ? 0 : 2;
+    return (SIMBOLO[m] ?? '') + v.toLocaleString(m === 'COP' || m === 'CLP' ? 'es-CO' : 'en-US', { minimumFractionDigits: dec, maximumFractionDigits: dec });
+  };
+  const plata = (n, m = 'USD') => `${cifra(n, m)} ${m}`;
+  const demo = n => '$' + Number(n).toFixed(2); // precios ilustrativos de las maquetas
+  const NOMBRE_MONEDA = { USD: 'dólares estadounidenses (USD)', COP: 'pesos colombianos (COP)', MXN: 'pesos mexicanos (MXN)', EUR: 'euros (EUR)' };
 
   // ── Navegación ──
   const nav = $('nav');
@@ -40,14 +48,14 @@
   (async function caja() {
     const prods = [...document.querySelectorAll('.pt-prod')], lineas = $('ptLineas'), tot = $('ptTotal');
     if (!prods.length) return;
-    const datos = [['Leche 1 L', 4600], ['Tomate 1,25 kg', 6000], ['Croissant', 2800], ['Arroz 1 kg', 4900], ['Agua', 2400]];
+    const datos = [['Leche 1 L', 115], ['Tomate 1.25 kg', 300], ['Croissant', 70], ['Arroz 1 kg', 125], ['Agua', 60]]; // centavos
     const orden = [1, 0, 3, 4, 2];
-    const contar = async (de, a) => { for (let i = 1; i <= 12; i++) { tot.textContent = plata(Math.round(de + (a - de) * i / 12)); await dormir(28); } };
+    const contar = async (de, a) => { for (let i = 1; i <= 12; i++) { tot.textContent = demo(Math.round(de + (a - de) * i / 12) / 100); await dormir(28); } };
     for (;;) {
-      lineas.innerHTML = ''; tot.textContent = plata(0); let suma = 0;
+      lineas.innerHTML = ''; tot.textContent = demo(0); let suma = 0;
       for (let i = 0; i < datos.length; i++) {
         const p = prods[orden[i]]; p.classList.add('pulsado'); await dormir(180); p.classList.remove('pulsado');
-        const [n, v] = datos[i]; lineas.insertAdjacentHTML('afterbegin', `<div class="pt-lin"><span>${n}</span><b>${plata(v)}</b></div>`);
+        const [n, v] = datos[i]; lineas.insertAdjacentHTML('afterbegin', `<div class="pt-lin"><span>${n}</span><b>${demo(v / 100)}</b></div>`);
         await contar(suma, suma + v); suma += v;
         await dormir(quieto ? 0 : 650);
       }
@@ -58,10 +66,10 @@
 
   // ── Chat de WhatsApp con el asistente ──
   const guion = [
-    ['cli', 'Hola! quiero 2 leches enteras y una libra de tomate 🍅'],
-    ['bot', 'Agregué a tu carrito:\n• 2 Leche entera 1 L — <b>$9.200</b>\n• 0,5 kg Tomate — <b>$2.160</b> (promo −10%)\n¿Te lo envío a domicilio? Comparte tu ubicación 📍'],
+    ['cli', 'Hola! quiero 2 leches enteras y medio kilo de tomate 🍅'],
+    ['bot', 'Agregué a tu carrito:\n• 2 Leche entera 1 L — <b>$2.30</b>\n• 0.5 kg Tomate — <b>$1.08</b> (promo −10%)\n¿Te lo envío a domicilio? Comparte tu ubicación 📍'],
     ['cli', '<span class="ubi"><i class="fa-solid fa-location-dot"></i> Ubicación compartida</span>'],
-    ['bot', '¡Llegamos! Domicilio <b>$3.000</b>, unos 45 min.\nTotal: <b>$14.360</b>. ¿Pagas en efectivo o con QR?'],
+    ['bot', '¡Llegamos! Domicilio <b>$1.50</b>, unos 45 min.\nTotal: <b>$4.88</b>. ¿Pagas en efectivo o con QR?'],
     ['cli', 'Efectivo. Sí, confirmo ✅'],
     ['sis', '✅ Pedido <b>D-00003</b> recibido. Síguelo aquí: orbita.katupos.com/seguimiento'],
   ];
@@ -96,18 +104,18 @@
 
   // ── Planes ──
   const EJEMPLO = [
-    { codigo: 'basico', nombre: 'Básico', descripcion: 'Para empezar a vender rápido y en regla.', moneda: 'COP', precioMensual: 89000, precioAnual: 890000, caracteristicas: ['Caja rápida con lector y báscula', 'Inventario, compras y vencimientos', 'Factura electrónica DIAN', 'Fiado y cartera de clientes', 'Informes y arqueos de turno', 'Funciona sin internet'] },
-    { codigo: 'pro', nombre: 'Pro', destacado: true, descripcion: 'Vende también a domicilio y por WhatsApp.', moneda: 'COP', precioMensual: 179000, precioAnual: 1790000, caracteristicas: ['Todo lo del plan Básico', 'Tienda en línea con tu subdominio', 'Domicilios con seguimiento y PIN', 'WhatsApp con asistente de IA y asesores', 'Puntos, niveles y misiones para clientes'] },
-    { codigo: 'premium', nombre: 'Premium', descripcion: 'La experiencia completa para crecer.', moneda: 'COP', precioMensual: 299000, precioAnual: 2990000, caracteristicas: ['Todo lo del plan Pro', 'Kiosco de autopago', 'Campañas por WhatsApp y correo', 'Ventas atribuidas a cada campaña', 'Soporte prioritario'] },
+    { codigo: 'basico', nombre: 'Básico', descripcion: 'Para empezar a vender rápido y en regla.', moneda: 'USD', precioMensual: 29, precioAnual: 290, caracteristicas: ['Caja rápida con lector y báscula', 'Inventario, compras y vencimientos', 'Factura electrónica (según tu país)', 'Fiado y cartera de clientes', 'Informes y arqueos de turno', 'Funciona sin internet'] },
+    { codigo: 'pro', nombre: 'Pro', destacado: true, descripcion: 'Vende también a domicilio y por WhatsApp.', moneda: 'USD', precioMensual: 59, precioAnual: 590, caracteristicas: ['Todo lo del plan Básico', 'Tienda en línea con tu subdominio', 'Domicilios con seguimiento y PIN', 'WhatsApp con asistente de IA y asesores', 'Puntos, niveles y misiones para clientes'] },
+    { codigo: 'premium', nombre: 'Premium', descripcion: 'La experiencia completa para crecer.', moneda: 'USD', precioMensual: 99, precioAnual: 990, caracteristicas: ['Todo lo del plan Pro', 'Kiosco de autopago', 'Campañas por WhatsApp y correo', 'Ventas atribuidas a cada campaña', 'Soporte prioritario'] },
   ];
   let planes = EJEMPLO, periodo = 'mensual', apiLista = false;
   function pintarPlanes() {
     $('planesLista').innerHTML = planes.map(p => {
-      const anual = periodo === 'anual', precio = anual ? Math.round(p.precioAnual / 12) : p.precioMensual;
+      const anual = periodo === 'anual', precio = anual ? Math.round(p.precioAnual / 12 * 100) / 100 : p.precioMensual;
       const ahorro = Math.max(0, p.precioMensual * 12 - p.precioAnual);
       return `<article class="plan ${p.destacado ? 'destacado' : ''}">${p.destacado ? '<span class="cinta">RECOMENDADO</span>' : ''}
         <h3>${esc(p.nombre)}</h3><p class="desc">${esc(p.descripcion || '')}</p>
-        <div class="precio"><b>${plata(precio, p.moneda)}</b><span>/ mes</span></div>
+        <div class="precio"><b>${cifra(precio, p.moneda)}</b><span>${esc(p.moneda)} / mes</span></div>
         <div class="ahorro">${anual ? `${plata(p.precioAnual, p.moneda)} al año · ahorras ${plata(ahorro, p.moneda)}` : p.diasPrueba ? `${p.diasPrueba} días de prueba gratis` : ''}</div>
         <ul>${(p.caracteristicas || []).map(c => `<li><i class="fa-solid fa-check"></i>${esc(c)}</li>`).join('')}</ul>
         <button class="btn ${p.destacado ? 'btn-brillo' : 'btn-borde'} btn-xl ancho" data-plan="${esc(p.codigo)}">Elegir ${esc(p.nombre)}</button></article>`;
@@ -120,11 +128,34 @@
     pintarPlanes();
   };
   fetch(`${K.API}/registro/planes`).then(r => r.json()).then(d => {
-    if (d.success && d.data.planes?.length) { planes = d.data.planes; apiLista = true; pintarPlanes(); }
+    if (d.success && d.data.planes?.length) {
+      planes = d.data.planes; apiLista = true; pintarPlanes();
+      const monedas = [...new Set(planes.map(p => p.moneda))];
+      if (monedas.length === 1) $('notaMoneda').textContent = `Precios en ${NOMBRE_MONEDA[monedas[0]] || monedas[0]}.`;
+    }
     if (d.data?.modoPrueba) $('modoPrueba').textContent = 'Pagos en modo de prueba: usa la tarjeta 4242 4242 4242 4242.';
   }).catch(() => {});
   pintarPlanes();
   $('planesLista').onclick = e => { const b = e.target.closest('[data-plan]'); if (b) abrirRegistro(b.dataset.plan); };
+
+  // ── Países (Admin → Países decide dónde se ofrece la facturación electrónica) ──
+  let paises = [];
+  const lista = ns => ns.length > 1 ? `${ns.slice(0, -1).join(', ')} y ${ns[ns.length - 1]}` : ns[0] || '';
+  fetch(`${K.API}/registro/paises`).then(r => r.json()).then(d => {
+    if (!d.success || !d.data?.length) return;
+    paises = d.data;
+    const sel = $('rPais'), zona = Intl.DateTimeFormat().resolvedOptions().timeZone;
+    const propio = paises.find(p => p.zonasHorarias.includes(zona));
+    sel.innerHTML = paises.map(p => `<option value="${esc(p.codigo)}">${esc(p.nombre)}</option>`).join('');
+    if (propio) sel.value = propio.codigo;
+    $('faqPaises').textContent = `Hoy puedes registrar tu negocio en ${lista(paises.map(p => p.nombre))}.`;
+    const fe = paises.filter(p => p.facturacion.ofrecida).map(p => p.nombre);
+    if (fe.length) {
+      $('paisesFe').innerHTML = `<i class="fa-solid fa-earth-americas"></i> Disponible en ${esc(lista(fe))}`; $('paisesFe').hidden = false;
+      $('faqFe').textContent = `Hoy la ofrecemos en ${lista(fe)}: se emite sola en cada venta y te acompañamos en la habilitación ante la autoridad fiscal.`;
+    }
+    if (!reg.hidden) notaPais();
+  }).catch(() => {});
 
   // ── Registro → Stripe ──
   let planSel = null, subTocado = false, tSub, subOk = false;
@@ -134,7 +165,7 @@
     planSel = planes.find(p => p.codigo === codigo) || planes[0];
     $('rPlan').textContent = `Plan ${planSel.nombre}`; $('rPeriodo').value = periodo;
     $('rError').hidden = true; reg.hidden = false; document.body.style.overflow = 'hidden';
-    resumen(); setTimeout(() => $('rNegocio').focus(), 60);
+    resumen(); notaPais(); setTimeout(() => $('rNegocio').focus(), 60);
   }
   const cerrar = () => { reg.hidden = true; document.body.style.overflow = ''; };
   reg.addEventListener('click', e => { if (e.target === reg || e.target.closest('[data-cerrar]')) cerrar(); });
@@ -144,6 +175,16 @@
     $('rResumen').innerHTML = `<span>Plan <b style="font-size:15px">${esc(p.nombre)}</b> · ${anual ? 'anual' : 'mensual'}${p.diasPrueba ? `<br><small>${p.diasPrueba} días de prueba gratis</small>` : ''}</span><b>${plata(anual ? p.precioAnual : p.precioMensual, p.moneda)}<small style="font-size:13px;font-weight:600;color:#475A77"> / ${anual ? 'año' : 'mes'}</small></b>`;
   }
   $('rPeriodo').onchange = resumen;
+  function notaPais() {
+    const p = paises.find(x => x.codigo === $('rPais').value), n = $('rPaisNota');
+    if (!p || !planSel?.modulos?.facturacion) { n.hidden = true; return; }
+    n.hidden = false;
+    n.className = 'nota-pais' + (p.facturacion.ofrecida ? ' ok' : '');
+    n.innerHTML = p.facturacion.ofrecida
+      ? `<i class="fa-solid fa-file-invoice"></i> En ${esc(p.nombre)} tu plan incluye ${esc((p.facturacion.nombreDocumento || 'factura electrónica').toLowerCase())}${p.facturacion.entidad ? ` (${esc(p.facturacion.entidad)})` : ''}.`
+      : `<i class="fa-solid fa-circle-info"></i> En ${esc(p.nombre)} aún no ofrecemos facturación electrónica: vendes con tiquetes de venta y te avisamos cuando esté disponible.`;
+  }
+  $('rPais').onchange = notaPais;
   $('rNegocio').oninput = () => { if (!subTocado) { $('rSub').value = slug($('rNegocio').value); revisarSub(); } };
   $('rSub').oninput = () => { subTocado = true; const v = slug($('rSub').value); if (v !== $('rSub').value) $('rSub').value = v; revisarSub(); };
   function revisarSub() {

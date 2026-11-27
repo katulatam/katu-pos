@@ -14,6 +14,7 @@ function validar(d) {
   if (d.locale) { try { new Intl.NumberFormat(d.locale); } catch { throw new ErrorApi('Configuración regional inválida (ej. es-CO)'); } }
   if (d.impuestos && d.impuestoDefecto && !d.impuestos.some(i => i.codigo === d.impuestoDefecto)) throw new ErrorApi('El impuesto por defecto no está en la lista');
   if (d.facturacion?.proveedor && !PROVEEDORES[d.facturacion.proveedor]) throw new ErrorApi('Proveedor de facturación no soportado');
+  if (d.facturacion?.ofrecida && !d.facturacion.proveedor) throw new ErrorApi('Para ofrecer facturación electrónica en el país elige su proveedor');
 }
 
 exports.listar = manejar(async () => {

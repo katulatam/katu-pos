@@ -37,12 +37,12 @@
   function editar(p = null) {
     const m = modal({ clase: 'l', titulo: p ? `Plan ${esc(p.nombre)}` : 'Nuevo plan', html: '<div id="f"></div>', pie: '<button class="btn p" data-s>Guardar</button>' });
     const f = formulario(m.q('#f'), [
-      ...(p ? [] : [{ k: 'codigo', l: 'Código (sin espacios)', req: 1 }]), { k: 'nombre', l: 'Nombre', req: 1 }, { k: 'moneda', l: 'Moneda', t: 'lista', op: [['COP', 'Pesos colombianos (COP)'], ['USD', 'Dólares (USD)'], ['MXN', 'Pesos mexicanos (MXN)']] },
+      ...(p ? [] : [{ k: 'codigo', l: 'Código (sin espacios)', req: 1 }]), { k: 'nombre', l: 'Nombre', req: 1 }, { k: 'moneda', l: 'Moneda', t: 'lista', op: [['USD', 'Dólares (USD)'], ['COP', 'Pesos colombianos (COP)'], ['MXN', 'Pesos mexicanos (MXN)'], ['EUR', 'Euros (EUR)']] },
       { k: 'precioMensual', l: 'Precio mensual', t: 'numero', req: 1 }, { k: 'precioAnual', l: 'Precio anual', t: 'numero', req: 1 }, { k: 'diasPrueba', l: 'Días de prueba gratis', t: 'numero' }, { k: 'orden', l: 'Orden en la landing', t: 'numero' },
       { k: 'descripcion', l: 'Descripción corta', w: 12 }, { k: 'caracteristicas', l: 'Lo que incluye (una línea por punto)', t: 'area', w: 12 },
       { t: 'titulo', l: 'Módulos que se activan' }, ...Object.entries(MOD).map(([k, t]) => ({ k: 'modulos.' + k, l: t, t: 'si' })),
       { t: 'titulo', l: 'Publicación' }, { k: 'destacado', l: 'Destacado en la landing', t: 'si' }, { k: 'activo', l: 'Disponible para suscribirse', t: 'si', def: true },
-    ], p ? { ...p, caracteristicas: (p.caracteristicas || []).join('\n') } : { moneda: 'COP', activo: true, diasPrueba: 0 });
+    ], p ? { ...p, caracteristicas: (p.caracteristicas || []).join('\n') } : { moneda: 'USD', activo: true, diasPrueba: 0 });
     m.q('[data-s]').onclick = async () => {
       const o = f.validar(); if (!o) return;
       if (await datos(p ? `/cuenta/planes/${p._id}` : '/cuenta/planes', p ? 'PUT' : 'POST', o)) { m.cerrar(); toast('Plan guardado'); cargar(); }

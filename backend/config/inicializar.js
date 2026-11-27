@@ -9,6 +9,8 @@ module.exports = async () => {
   for (const [codigo, datos] of Object.entries(PAISES)) {
     await Pais.updateOne({ codigo }, { $setOnInsert: { codigo, ...datos } }, { upsert: true });
   }
+  // Países creados antes de existir "ofrecida": se ofrece donde ya hay proveedor
+  await Pais.updateMany({ 'facturacion.ofrecida': { $exists: false } }, [{ $set: { 'facturacion.ofrecida': { $gt: [{ $strLenCP: { $ifNull: ['$facturacion.proveedor', ''] } }, 0] } } }]);
 
   const correo = (process.env.KATU_ADMIN_EMAIL || 'katu@katulatam.com').toLowerCase();
   if (await Usuario.exists({ correo })) return;

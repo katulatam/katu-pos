@@ -11,6 +11,8 @@ Sitio estático (HTML, CSS y JS, sin compilación). Se sube tal cual al balancea
 | `estilos.css`, `app.js` | Diseño y lógica |
 
 - **Planes y precios** salen de la API (`/api/v1/registro/planes`), que se editan en Admin → Katú → Planes y registros. Si la API no responde, la página muestra los precios de ejemplo y no deja continuar al pago.
+- **Moneda de los precios**: la de cada plan (Admin → Planes; por defecto USD). La nota bajo los planes se ajusta sola.
+- **Países y facturación electrónica** salen de `/api/v1/registro/paises`. En Admin → Países, la casilla "Ofrecer facturación electrónica en este país" decide dónde se anuncia (tarjeta de funciones, preguntas frecuentes, aviso en el registro) y si se activa a los negocios nuevos. El país del registro se preselecciona por la zona horaria del visitante.
 - **Registro**: valida el subdominio en vivo, crea el registro y redirige al Checkout de Stripe.
 - **Enlace directo a un plan**: `https://www.katupos.com/#plan-pro` abre el registro con ese plan.
 - **Revisar textos antes de publicar**: las promesas comerciales (por ejemplo "soporte prioritario", "factura incluida en todos los planes", "copias de seguridad diarias") deben coincidir con lo que Katú ofrece.

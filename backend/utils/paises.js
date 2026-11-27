@@ -26,7 +26,7 @@ const PAISES = {
     ],
     consumidorFinal: { tipoDocumento: '13', documento: '222222222222', nombre: 'Consumidor Final' },
     mediosPago: [EFECTIVO, { codigo: 'qr_nequi', nombre: 'QR Nequi', tipo: 'qr', proveedor: 'katupay_nequi', icono: 'fa-qrcode' }, QR_TARJETA, DATAFONO, TRANSFERENCIA, FIADO],
-    facturacion: { proveedor: 'alanube_co', nombreDocumento: 'Factura electrónica de venta', entidad: 'DIAN', codigoUnico: 'CUFE' },
+    facturacion: { proveedor: 'alanube_co', ofrecida: true, nombreDocumento: 'Factura electrónica de venta', entidad: 'DIAN', codigoUnico: 'CUFE' },
   },
   MX: {
     nombre: 'México', moneda: 'MXN', simbolo: '$', decimales: 2, locale: 'es-MX',
