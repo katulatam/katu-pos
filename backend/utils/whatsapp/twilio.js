@@ -118,10 +118,13 @@ async function llamarJSON(cred, metodo, url, datos) {
 }
 // cuerpo con {{1}} = nombre del cliente. nombre: identificador en minúsculas y guiones bajos.
 // Marketing (campañas) por defecto; los avisos de pedidos van como UTILITY.
-async function crearPlantilla(subSid, { nombre, cuerpo, categoria = 'MARKETING', variables = { 1: 'Cliente' } }) {
+// media: dirección de la imagen con dominio fijo y la parte variable al final
+// (p. ej. https://app.katupos.com/api/v1/publico/promo-img/{{4}}): así lo exige WhatsApp.
+async function crearPlantilla(subSid, { nombre, cuerpo, categoria = 'MARKETING', variables = { 1: 'Cliente' }, media }) {
   if (simulado()) return { contentSid: 'HX' + crypto.randomBytes(16).toString('hex') };
   const cred = await credSub(subSid);
-  const c = await llamarJSON(cred, 'post', `${CONTENT}/Content`, { friendly_name: nombre, language: 'es', variables, types: { 'twilio/text': { body: cuerpo } } });
+  const types = media ? { 'twilio/media': { body: cuerpo, media: [media] } } : { 'twilio/text': { body: cuerpo } };
+  const c = await llamarJSON(cred, 'post', `${CONTENT}/Content`, { friendly_name: nombre, language: 'es', variables, types });
   await llamarJSON(cred, 'post', `${CONTENT}/Content/${c.sid}/ApprovalRequests/whatsapp`, { name: nombre, category: categoria });
   return { contentSid: c.sid };
 }

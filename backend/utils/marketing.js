@@ -7,6 +7,8 @@ const Venta = require('../models/Venta');
 const gamificacion = require('./gamificacion');
 const correo = require('./correo/sendgrid');
 const { ErrorApi, paisDe, ahoraDe } = require('./contexto');
+const diseno = require('./correoDiseno');
+const Motor = require('../../frontend/assets/js/motor');
 
 // ── Marketing: segmentos, campañas, bajas y atribución ─────────────────────
 // Solo se escribe a quien autorizó ESE canal (Cliente.marketing.whatsapp /
@@ -53,9 +55,18 @@ async function bajaWhatsapp(empresa, telefonos) {
 // ── Correo con la marca del comercio ───────────────────────────────────────
 const escHtml = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const personalizar = (t, cliente) => String(t || '').replace(/\{nombre\}/gi, primerNombre(cliente?.nombre) || 'cliente');
-function armarCorreo(empresa, { asunto, cuerpo }, cliente) {
+// ctx: { productos: Map id → producto con precio del día, dinero } (lo arma prepararCorreo una vez por campaña)
+function armarCorreo(empresa, campana, cliente, ctx = {}) {
+  const { asunto, cuerpo } = campana;
+  const color = diseno.colorValido(campana.colorCorreo, diseno.colorValido(empresa.color, '#05C3DD'));
+  if (campana.formato === 'diseno' || campana.formato === 'html') {
+    const baja = cliente?._id ? enlaceBaja(cliente._id) : '#', nombre = primerNombre(cliente?.nombre) || 'cliente';
+    const html = campana.formato === 'html'
+      ? diseno.htmlPropio(empresa, campana.html, { baja, nombre })
+      : diseno.envolver(empresa, diseno.htmlBloques(campana.bloques || [], { color, nombre, productos: ctx.productos || new Map(), dinero: ctx.dinero }), { baja, color, preheader: personalizar(campana.preheader, cliente) });
+    return { asunto: personalizar(asunto, cliente).slice(0, 150), html, texto: `${diseno.aTexto(html)}\n\nPara no recibir más correos: ${baja}`, baja };
+  }
   const texto = personalizar(cuerpo, cliente);
-  const color = /^#[0-9a-f]{6}$/i.test(empresa.color || '') ? empresa.color : '#05C3DD';
   const parrafos = texto.split(/\n{2,}/).map(p => `<p style="margin:0 0 14px;line-height:1.6">${escHtml(p).replace(/\*(.+?)\*/g, '<b>$1</b>').replace(/\n/g, '<br>')}</p>`).join('');
   const baja = cliente?._id ? enlaceBaja(cliente._id) : '#';
   const html = `<!doctype html><html lang="es"><body style="margin:0;background:#F1F5FA;font-family:Arial,Helvetica,sans-serif;color:#0B1729">
@@ -68,18 +79,47 @@ function armarCorreo(empresa, { asunto, cuerpo }, cliente) {
   return { asunto: personalizar(asunto, cliente).slice(0, 150), html, texto: `${texto}\n\n—\n${empresa.nombre}\nPara no recibir más correos: ${baja}`, baja };
 }
 
+// Productos de los bloques: nombre, foto, precio (y precio antes si están en la promoción del día)
+async function prepararCorreo(empresa, campana) {
+  const pais = await paisDe(empresa);
+  const dinero = n => Motor.dinero(n, pais);
+  const ids = [...new Set((campana.bloques || []).filter(b => b.tipo === 'productos').flatMap(b => b.productos || []))];
+  const productos = new Map();
+  if (ids.length) {
+    const tienda = require('./empresas').urlEmpresa(empresa.slug);
+    const promo = new Map((campana.promo?.items || []).map(i => [String(i.producto), i]));
+    for (const p of await require('../models/Producto').find({ _id: { $in: ids }, empresa: empresa._id }).select('nombre imagenUrl precio').lean()) {
+      const pr = promo.get(String(p._id));
+      productos.set(String(p._id), { nombre: p.nombre, imagenUrl: p.imagenUrl, precio: pr ? pr.precio : p.precio, precioAntes: pr ? pr.precioAntes : null, enlace: tienda });
+    }
+  }
+  return { productos, dinero };
+}
+
+// Límite de marketing por cliente: N por canal en 7 días y una promoción del día por día
+async function omitirPorLimite(empresa, campana, clienteId) {
+  const limite = empresa.marketing?.limiteSemanal ?? 2;
+  const base = { cliente: clienteId, canal: campana.canal, estado: { $in: ['enviado', 'entregado', 'leido'] } };
+  if (campana.tipo === 'promo_dia' && await EnvioCampana.exists({ ...base, tipo: 'promo_dia', enviadoEn: { $gte: new Date(Date.now() - 20 * 3600000) } })) return 'Ya recibió la promoción del día';
+  if (limite > 0 && await EnvioCampana.countDocuments({ ...base, enviadoEn: { $gte: new Date(Date.now() - 7 * 86400000) } }) >= limite) return `Límite de ${limite} mensajes por semana`;
+  return null;
+}
+
 // ── Envío de un destinatario ───────────────────────────────────────────────
-async function enviarUno(empresa, campana, cliente) {
+async function enviarUno(empresa, campana, cliente, ctx) {
   if (campana.canal === 'whatsapp') {
     const wa = require('./whatsapp');
     const pais = await paisDe(empresa);
     const telefono = wa.aE164(pais, cliente.telefono);
-    const m = await wa.enviarPlantilla({ empresa, telefono, plantilla: campana.plantilla, variables: { 1: primerNombre(cliente.nombre) || 'cliente' }, texto: String(campana.cuerpo || '').replace(/\{\{1\}\}/g, primerNombre(cliente.nombre)), tipo: 'marketing', referencia: campana.nombre });
+    // {{1}} = nombre del cliente; {{2}}, {{3}}… = variables de la campaña (p. ej. la oferta del día)
+    const variables = { ...(campana.variables || {}), 1: primerNombre(cliente.nombre) || 'cliente' };
+    const texto = String(campana.cuerpo || '').replace(/\{\{(\d+)\}\}/g, (m, n) => variables[n] ?? m);
+    const m = await wa.enviarPlantilla({ empresa, telefono, plantilla: campana.plantilla, variables, texto, tipo: 'marketing', referencia: campana.nombre });
     return { destino: telefono, sid: m.sid, estado: m.estado === 'entregado' ? 'entregado' : 'enviado' }; // el simulador entrega al instante
   }
   const wa = require('./whatsapp');
   await wa.consumir(empresa._id, { canal: 'correo', motivo: 'Campaña', referencia: campana.nombre });
-  const c = armarCorreo(empresa, campana, cliente);
+  const c = armarCorreo(empresa, campana, cliente, ctx || (campana.formato === 'diseno' ? await prepararCorreo(empresa, campana) : {}));
   const r = await correo.enviar({ a: cliente.correo, asunto: c.asunto, html: c.html, texto: c.texto, nombreRemitente: empresa.nombre, responderA: empresa.correo || undefined, baja: c.baja, datos: { campana: campana._id } });
   return { destino: cliente.correo, sid: r.id || undefined };
 }
@@ -109,7 +149,7 @@ async function procesar() {
       if (!tomada) continue;
       const empresa = await Empresa.findById(c.empresa).lean();
       const lista = await destinatarios(empresa, c.canal, c.segmento);
-      if (lista.length) await EnvioCampana.insertMany(lista.map(x => ({ empresa: c.empresa, campana: c._id, cliente: x._id })), { ordered: false }).catch(e => { if (e.code !== 11000 && !e.writeErrors) throw e; });
+      if (lista.length) await EnvioCampana.insertMany(lista.map(x => ({ empresa: c.empresa, campana: c._id, cliente: x._id, canal: c.canal, tipo: c.tipo || 'normal' })), { ordered: false }).catch(e => { if (e.code !== 11000 && !e.writeErrors) throw e; });
       await Campana.updateOne({ _id: c._id }, { 'totales.destinatarios': await EnvioCampana.countDocuments({ campana: c._id }) });
     }
     const activas = await Campana.find({ estado: 'enviando' }).limit(10).lean();
@@ -119,11 +159,15 @@ async function procesar() {
       if (b) { await Campana.updateOne({ _id: c._id, estado: 'enviando' }, { estado: 'pausada', motivoPausa: b }); continue; }
       const pendientes = await EnvioCampana.find({ campana: c._id, estado: 'pendiente' }).populate('cliente', 'nombre telefono correo marketing activo').limit(LOTE).lean();
       if (!pendientes.length) { await Campana.updateOne({ _id: c._id, estado: 'enviando' }, { estado: 'enviada', terminadaEn: new Date() }); continue; }
+      const ctx = c.canal === 'correo' && c.formato === 'diseno' ? await prepararCorreo(empresa, c) : undefined;
       for (const e of pendientes) {
         // Se revisa la autorización justo antes de enviar: pudo darse de baja
-        if (!e.cliente?.activo || !e.cliente?.marketing?.[c.canal]) { await EnvioCampana.updateOne({ _id: e._id }, { estado: 'omitido' }); await Campana.updateOne({ _id: c._id }, { $inc: { 'totales.omitidos': 1 } }); continue; }
+        if (!e.cliente?.activo || !e.cliente?.marketing?.[c.canal]) { await EnvioCampana.updateOne({ _id: e._id }, { estado: 'omitido', motivo: 'Se dio de baja' }); await Campana.updateOne({ _id: c._id }, { $inc: { 'totales.omitidos': 1 } }); continue; }
+        // No saturar al cliente: límite semanal por canal y una promoción del día por día
+        const limite = await omitirPorLimite(empresa, c, e.cliente._id);
+        if (limite) { await EnvioCampana.updateOne({ _id: e._id }, { estado: 'omitido', motivo: limite }); await Campana.updateOne({ _id: c._id }, { $inc: { 'totales.omitidos': 1 } }); continue; }
         try {
-          const r = await enviarUno(empresa, c, e.cliente);
+          const r = await enviarUno(empresa, c, e.cliente, ctx);
           await EnvioCampana.updateOne({ _id: e._id }, { estado: r.estado || 'enviado', destino: r.destino, sid: r.sid, enviadoEn: new Date() });
           await Campana.updateOne({ _id: c._id }, { $inc: { 'totales.enviados': 1 } });
         } catch (err) {
@@ -157,4 +201,4 @@ async function atribucion(campana) {
   return { ventas: ok.length, compradores: new Set(ok.map(v => String(v.cliente))).size, total: ok.reduce((a, v) => a + (v.total || 0), 0), dias: DIAS_ATRIBUCION };
 }
 
-module.exports = { SEGMENTOS, destinatarios, armarCorreo, enviarUno, bloqueo, procesar, estadoEnvio, atribucion, bajaCorreo, bajaWhatsapp, PALABRA_BAJA, enlaceBaja, personalizar };
+module.exports = { SEGMENTOS, destinatarios, armarCorreo, prepararCorreo, omitirPorLimite, enviarUno, bloqueo, procesar, estadoEnvio, atribucion, bajaCorreo, bajaWhatsapp, PALABRA_BAJA, enlaceBaja, personalizar };

@@ -3,6 +3,8 @@ const Cliente = require('../models/Cliente');
 const Campana = require('../models/Campana');
 const EnvioCampana = require('../models/EnvioCampana');
 const mk = require('../utils/marketing');
+const promo = require('../utils/promoDia');
+const diseno = require('../utils/correoDiseno');
 const wa = require('../utils/whatsapp');
 const correo = require('../utils/correo/sendgrid');
 const { manejar, ErrorApi } = require('../utils/contexto');
@@ -27,7 +29,8 @@ exports.resumen = manejar(async req => {
     clientes: { total, whatsapp: conWhatsapp, correo: conCorreo },
     saldo: { whatsapp: e.mensajeria?.saldoWhatsapp || 0, correo: e.mensajeria?.saldoCorreo || 0 },
     whatsappListo: wa.listo(e), correoListo: correo.disponible(), simuladores: { whatsapp: wa.twilio.simulado(), correo: correo.simulado() },
-    plantillas: (e.whatsapp?.plantillasMarketing || []).map(p => ({ _id: p._id, nombre: p.nombre, contentSid: p.contentSid, cuerpo: p.cuerpo, estado: p.estado, motivo: p.motivo })),
+    plantillas: (e.whatsapp?.plantillasMarketing || []).map(p => ({ _id: p._id, nombre: p.nombre, contentSid: p.contentSid, cuerpo: p.cuerpo, estado: p.estado, motivo: p.motivo, sistema: p.sistema || '' })),
+    limiteSemanal: e.marketing?.limiteSemanal ?? 2, color: e.color || '', logoUrl: e.logoUrl || '', tienda: require('../utils/empresas').urlEmpresa(e.slug),
     niveles: (e.gamificacion?.niveles || []).map(n => n.nombre), segmentos: mk.SEGMENTOS,
   };
 });
@@ -81,15 +84,75 @@ function datosCampana(req, e) {
   const d = { nombre: String(b.nombre || '').trim().slice(0, 100), canal, segmento: { tipo: mk.SEGMENTOS.includes(b.segmento?.tipo) ? b.segmento.tipo : 'todos', dias: Number(b.segmento?.dias) || undefined, compras: Number(b.segmento?.compras) || undefined, nivel: b.segmento?.nivel || undefined } };
   if (!d.nombre) throw new ErrorApi('Ponle un nombre a la campaña');
   if (canal === 'whatsapp') {
-    const p = (e.whatsapp?.plantillasMarketing || []).find(x => x.contentSid === b.plantilla);
+    // La plantilla de la promoción del día se usa desde su propia pantalla (lleva la oferta como variable)
+    const p = (e.whatsapp?.plantillasMarketing || []).find(x => x.contentSid === b.plantilla && !x.sistema);
     if (!p) throw new ErrorApi('Elige una plantilla de WhatsApp');
     Object.assign(d, { plantilla: p.contentSid, plantillaNombre: p.nombre, cuerpo: p.cuerpo, asunto: undefined });
-  } else {
-    d.asunto = String(b.asunto || '').trim().slice(0, 150); d.cuerpo = String(b.cuerpo || '').trim().slice(0, 5000);
-    if (!d.asunto || d.cuerpo.length < 10) throw new ErrorApi('Escribe el asunto y el mensaje del correo');
+  } else Object.assign(d, datosCorreo(b));
+  return d;
+}
+// Correo: texto simple, diseño con bloques o HTML propio
+function datosCorreo(b) {
+  const formato = ['texto', 'diseno', 'html'].includes(b.formato) ? b.formato : 'texto';
+  const d = { formato, asunto: String(b.asunto || '').trim().slice(0, 150), preheader: String(b.preheader || '').trim().slice(0, 150), colorCorreo: diseno.colorValido(b.colorCorreo, undefined) };
+  if (!d.asunto) throw new ErrorApi('Escribe el asunto del correo');
+  if (formato === 'texto') { d.cuerpo = String(b.cuerpo || '').trim().slice(0, 5000); if (d.cuerpo.length < 10) throw new ErrorApi('Escribe el mensaje del correo'); }
+  if (formato === 'diseno') { d.bloques = diseno.limpiarBloques(b.bloques); if (!d.bloques.length) throw new ErrorApi('Agrega al menos un bloque al diseño del correo'); d.cuerpo = diseno.aTexto(d.bloques.map(x => x.texto || '').join('\n')).slice(0, 5000); }
+  if (formato === 'html') {
+    try { d.html = diseno.limpiarHtml(b.html); } catch (x) { throw new ErrorApi(x.message); }
+    if (d.html.replace(/<[^>]+>/g, '').trim().length < 10) throw new ErrorApi('Pega el HTML del correo');
+    d.cuerpo = diseno.aTexto(d.html).slice(0, 5000);
   }
   return d;
 }
+
+// Vista previa del correo tal como llegará (con un cliente de ejemplo)
+exports.vistaCorreo = manejar(async req => {
+  const e = await Empresa.findById(req.empresa._id).lean();
+  const d = datosCorreo({ asunto: 'Vista previa', ...req.body });
+  const c = { ...d, promo: req.body.promo };
+  const r = mk.armarCorreo(e, c, { nombre: 'Valentina' }, c.formato === 'diseno' ? await mk.prepararCorreo(e, c) : {});
+  return { asunto: r.asunto, html: r.html };
+});
+
+// Productos para los bloques del correo y la promoción del día
+exports.productos = manejar(async req => {
+  const q = String(req.query.q || '').trim();
+  const rx = q ? new RegExp(q.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i') : null;
+  return require('../models/Producto').find({ empresa: req.empresa._id, activo: true, ...(rx && { $or: [{ nombre: rx }, { codigo: rx }] }) }).select('nombre precio imagenUrl codigo').sort({ nombre: 1 }).limit(20).lean();
+});
+
+// ── Promoción del día ──────────────────────────────────────────────────────
+exports.promoDia = manejar(async req => {
+  const e = await Empresa.findById(req.empresa._id).lean();
+  // Refresca en Meta las que siguen en revisión (texto y con imagen)
+  const refrescar = async p => {
+    if (p?.estado !== 'pendiente' || !p.contentSid || !e.whatsapp?.subcuentaSid) return p;
+    try {
+      const s = await wa.twilio.estadoPlantilla(e.whatsapp.subcuentaSid, p.contentSid);
+      if (s.estado !== 'pendiente') { await Empresa.updateOne({ _id: e._id, 'whatsapp.plantillasMarketing.contentSid': p.contentSid }, { 'whatsapp.plantillasMarketing.$.estado': s.estado, 'whatsapp.plantillasMarketing.$.motivo': s.motivo || '' }); return { ...p, ...s }; }
+    } catch (x) { console.error('[marketing.promoDia]', x.message); }
+    return p;
+  };
+  const [p, pi] = [await refrescar(promo.plantillaDe(e)), await refrescar(promo.plantillaDe(e, true))];
+  const ultimas = await Campana.find({ empresa: e._id, tipo: 'promo_dia' }).sort({ createdAt: -1 }).limit(10).select('nombre canal estado programadaPara totales promo.texto').lean();
+  return {
+    plantilla: p && { estado: p.estado, motivo: p.motivo, cuerpo: p.cuerpo }, plantillaImagen: pi && { estado: pi.estado, motivo: pi.motivo },
+    whatsappListo: wa.listo(e), correoListo: correo.disponible(),
+    limiteSemanal: e.marketing?.limiteSemanal ?? 2, saldo: { whatsapp: e.mensajeria?.saldoWhatsapp || 0, correo: e.mensajeria?.saldoCorreo || 0 }, ultimas,
+  };
+});
+exports.promoPlantilla = manejar(async (req, res) => { res.status(201); return promo.asegurarPlantilla(req.empresa._id, { imagen: !!req.body?.imagen }); });
+exports.promoVista = manejar(req => promo.vista(req.empresa, req.body));
+exports.promoCrear = manejar(async (req, res) => { res.status(201); return promo.crear(req.empresa, req.usuario._id, req.body); });
+
+// Límite de mensajes de marketing por cliente y canal a la semana (0 = sin límite)
+exports.config = manejar(async req => {
+  const n = Number(req.body.limiteSemanal);
+  if (!Number.isInteger(n) || n < 0 || n > 14) throw new ErrorApi('El límite va de 0 (sin límite) a 14 mensajes por semana');
+  await Empresa.updateOne({ _id: req.empresa._id }, { 'marketing.limiteSemanal': n });
+  return { limiteSemanal: n };
+});
 exports.crear = manejar(async (req, res) => {
   const e = await Empresa.findById(req.empresa._id).lean();
   const c = await Campana.create({ ...datosCampana(req, e), empresa: e._id, creadaPor: req.usuario._id });

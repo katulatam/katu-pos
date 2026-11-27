@@ -158,6 +158,11 @@ async function verificar(numeroId, usuario) {
   });
   const activa = await Empresa.findById(e._id).lean();
   await crearPlantillasAvisos(activa);
+  // Con marketing: la plantilla reutilizable de la promoción del día (se aprueba una sola vez)
+  if (activa.modulos?.marketing) {
+    const pd = require('../promoDia');
+    for (const imagen of [false, true]) await pd.asegurarPlantilla(activa._id, { imagen }).catch(x => console.error('[whatsapp.promo_dia]', activa.slug, x.message));
+  }
   await correoListo(activa, n.numero);
   return { activo: true, numero: n.numero };
 }

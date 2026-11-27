@@ -63,7 +63,8 @@ const empresaSchema = new mongoose.Schema({
     // Plantillas aprobadas por Meta (contentSid) para avisar fuera de la ventana de 24 h.
     // Variables: {{1}} nombre, {{2}} número de pedido, {{3}} enlace de seguimiento
     // Plantillas de marketing creadas desde el sistema y enviadas a aprobación de Meta
-    plantillasMarketing: [{ nombre: String, contentSid: String, cuerpo: String, estado: { type: String, default: 'pendiente' }, motivo: String, creada: { type: Date, default: Date.now } }],
+    // sistema: plantillas que crea Katú (promo_dia = promoción del día, reutilizable con la oferta como variable)
+    plantillasMarketing: [{ nombre: String, contentSid: String, cuerpo: String, estado: { type: String, default: 'pendiente' }, motivo: String, sistema: String, creada: { type: Date, default: Date.now } }],
     plantillas: {
       recibido: { type: String, default: '' }, en_camino: { type: String, default: '' }, listo: { type: String, default: '' },
       entregado: { type: String, default: '' }, cancelado: { type: String, default: '' },
@@ -76,6 +77,10 @@ const empresaSchema = new mongoose.Schema({
     saldoWhatsapp: { type: Number, default: 0 },
     saldoCorreo:   { type: Number, default: 0 },
     avisosIncluidos: { type: Number, default: 0 },   // avisos de pedidos con plantilla (los asume Katú)
+  },
+  // Marketing: cuidar al cliente (y la calidad del número ante Meta)
+  marketing: {
+    limiteSemanal: { type: Number, default: 2, min: 0, max: 14 },  // mensajes de marketing por cliente y canal en 7 días (0 = sin límite)
   },
 
   pos: {

@@ -20,5 +20,14 @@ r.post('/campanas/:id/pausar', autorizar('admin'), c.pausar);
 r.post('/campanas/:id/reanudar', autorizar('admin'), c.reanudar);
 r.post('/campanas/:id/cancelar', autorizar('admin'), c.cancelar);
 r.post('/campanas/:id/prueba', autorizar('admin'), c.prueba);
+// Correo con diseño
+r.post('/vista-correo', c.vistaCorreo);
+r.get('/productos', c.productos);
+// Promoción del día
+r.get('/promo-dia', c.promoDia);
+r.post('/promo-dia/plantilla', autorizar('admin'), c.promoPlantilla);
+r.post('/promo-dia/vista', c.promoVista);
+r.post('/promo-dia', autorizar('admin'), c.promoCrear);
+r.put('/config', autorizar('admin'), c.config);
 
 module.exports = r;

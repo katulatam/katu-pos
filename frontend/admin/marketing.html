@@ -9,7 +9,7 @@
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
   <link rel="stylesheet" href="pos-admin.css">
   <style>
-    .tabs { display: flex; gap: 6px; }
+    .tabs { display: flex; gap: 6px; flex-wrap: wrap; }
     .tabs button { border: 1px solid var(--border); background: var(--surface); border-radius: 10px; padding: 8px 14px; font-weight: 600; font-size: 13px; color: var(--muted); }
     .tabs button.on { background: var(--primary-light); color: var(--primary); border-color: transparent; }
     .vista { background: #E7FFDB; color: #0B1729; border-radius: 12px; padding: 12px 14px; font-size: 13.5px; line-height: 1.5; white-space: pre-wrap; max-width: 420px; box-shadow: 0 1px 1px rgba(11,23,41,.08); }
@@ -17,6 +17,21 @@
     .cuenta { font-family: var(--titulo); font-size: 22px; font-weight: 800; }
     .met { display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 10px; }
     .met div { background: var(--sutil); border-radius: 12px; padding: 12px; } .met small { display: block; color: var(--muted); font-size: 11.5px; } .met b { font-family: var(--titulo); font-size: 20px; }
+    /* Editor de correo */
+    .ed-correo { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 16px; align-items: start; }
+    .ed-correo iframe { width: 100%; height: 620px; border: 1px solid var(--border); border-radius: 12px; background: #F1F5FA; }
+    .bloque { border: 1px solid var(--border); border-radius: 12px; padding: 10px 12px; margin-bottom: 8px; background: var(--surface); }
+    .bloque .bh { display: flex; align-items: center; gap: 6px; font-size: 12.5px; font-weight: 700; color: var(--muted); margin-bottom: 8px; }
+    .bloque .bh span { flex: 1; } .bloque .in { margin-bottom: 6px; }
+    .add-bloques { display: flex; flex-wrap: wrap; gap: 6px; margin: 6px 0 12px; }
+    .chips-p { display: flex; flex-wrap: wrap; gap: 6px; margin: 4px 0; } .chips-p span { background: var(--primary-light); border-radius: 20px; padding: 4px 10px; font-size: 12px; display: inline-flex; gap: 6px; align-items: center; } .chips-p button { border: none; background: none; cursor: pointer; color: var(--muted); }
+    .busca-res { border: 1px solid var(--border); border-radius: 10px; max-height: 200px; overflow: auto; margin-top: 4px; }
+    .busca-res button { display: flex; justify-content: space-between; width: 100%; padding: 8px 10px; border: none; background: var(--surface); text-align: left; font-size: 13px; cursor: pointer; border-bottom: 1px solid var(--border); } .busca-res button:hover { background: var(--sutil); }
+    /* Promoción del día */
+    .promo { display: grid; grid-template-columns: minmax(0, 1.1fr) minmax(0, .9fr); gap: 16px; align-items: start; }
+    .item-p { display: grid; grid-template-columns: minmax(0, 1fr) 130px 110px auto; gap: 8px; align-items: center; padding: 8px 0; border-bottom: 1px solid var(--border); font-size: 13px; }
+    .item-p small { display: block; color: var(--muted); }
+    @media (max-width: 980px) { .ed-correo, .promo { grid-template-columns: 1fr; } .item-p { grid-template-columns: 1fr 1fr; } }
   </style>
 </head>
 <body data-pagina="marketing">
@@ -28,14 +43,36 @@
   if (!(await POS.listo)) return;
   const main = document.querySelector('main');
   const ADM = POS.user.rol === 'admin' || POS.esSuper;
-  let R = null, pestaña = 'campanas';
+  let R = null, pestaña = 'promo';
   const EST = { borrador: ['Borrador', ''], programada: ['Programada', 'az'], enviando: ['Enviando', 'vi'], enviada: ['Enviada', 'ok'], pausada: ['Pausada', 'av'], cancelada: ['Cancelada', 'mal'] };
   const SEG = { todos: 'Todos los que autorizaron', recientes: 'Compraron en los últimos días', inactivos: 'Sin comprar hace días', frecuentes: 'Clientes frecuentes', cumpleanos: 'Cumplen años este mes', nivel: 'Por nivel de gamificación' };
   const textoSeg = s => s.tipo === 'recientes' ? `Compraron en los últimos ${s.dias || 30} días` : s.tipo === 'inactivos' ? `Sin comprar hace ${s.dias || 30} días` : s.tipo === 'frecuentes' ? `Con ${s.compras || 5}+ compras` : s.tipo === 'nivel' ? `Nivel ${s.nivel || ''}` : SEG[s.tipo] || 'Todos';
+  const debounce = (fn, ms = 400) => { let t; return (...a) => { clearTimeout(t); t = setTimeout(() => fn(...a), ms); }; };
+  // Vista previa del correo: iframe aislado, sin scripts
+  const pintarIframe = (el, html) => { el.setAttribute('sandbox', ''); el.srcdoc = html || ''; };
+
+  // Selector de segmento reutilizable (devuelve { html, leer, alCambiar })
+  function selectorSegmento(cont, inicial = {}, alCambiar = () => {}) {
+    cont.innerHTML = `<div class="f"><label>¿A quién?</label><select class="in" data-st>${Object.entries(SEG).filter(([k]) => k !== 'nivel' || R.niveles.length).map(([k, t]) => `<option value="${k}" ${inicial.tipo === k ? 'selected' : ''}>${t}</option>`).join('')}</select></div><div class="f" data-sp></div>`;
+    const st = cont.querySelector('[data-st]'), sp = cont.querySelector('[data-sp]');
+    const ver = () => { const t = st.value; sp.innerHTML = ['recientes', 'inactivos'].includes(t) ? `<label>Días</label><input class="in" data-sd type="number" min="1" value="${inicial.dias || 30}">` : t === 'frecuentes' ? `<label>Compras mínimas</label><input class="in" data-sc type="number" min="1" value="${inicial.compras || 5}">` : t === 'nivel' ? `<label>Nivel</label><select class="in" data-sn>${R.niveles.map(n => `<option ${inicial.nivel === n ? 'selected' : ''}>${esc(n)}</option>`).join('')}</select>` : ''; alCambiar(); };
+    st.onchange = ver; sp.oninput = () => alCambiar(); sp.onchange = () => alCambiar(); ver();
+    return () => { const t = st.value; return { tipo: t, ...(['recientes', 'inactivos'].includes(t) && { dias: Number(cont.querySelector('[data-sd]')?.value) || 30 }), ...(t === 'frecuentes' && { compras: Number(cont.querySelector('[data-sc]')?.value) || 5 }), ...(t === 'nivel' && { nivel: cont.querySelector('[data-sn]')?.value }) }; };
+  }
+  // Buscador de productos (alElegir recibe el producto)
+  function buscadorProductos(input, res, alElegir) {
+    const buscar = debounce(async () => {
+      const q = input.value.trim(); if (q.length < 2) { res.hidden = true; return; }
+      const l = await datos('/marketing/productos?q=' + encodeURIComponent(q)); if (!l) return;
+      res.innerHTML = l.map((p, i) => `<button type="button" data-i="${i}"><span>${esc(p.nombre)}</span><b>${dinero(p.precio)}</b></button>`).join('') || '<button type="button" disabled>Sin resultados</button>';
+      res.hidden = false; res.onclick = e => { const b = e.target.closest('[data-i]'); if (b) { alElegir(l[b.dataset.i]); input.value = ''; res.hidden = true; } };
+    }, 250);
+    input.oninput = buscar;
+  }
 
   async function cargar() {
     R = await datos('/marketing/resumen'); if (!R) return;
-    main.innerHTML = `<div class="head"><div><h1>Marketing</h1><p>Campañas por WhatsApp y correo para los clientes que autorizaron recibir promociones. Cada mensaje consume 1 de la bolsa.</p></div><div class="acts">${ADM ? '<button class="btn p" id="nueva"><i class="fa-solid fa-plus"></i> Nueva campaña</button>' : ''}</div></div>
+    main.innerHTML = `<div class="head"><div><h1>Marketing</h1><p>Promociones y campañas por WhatsApp y correo para los clientes que autorizaron recibirlas. Cada mensaje consume 1 de la bolsa.</p></div><div class="acts">${ADM ? '<button class="btn p" id="nueva"><i class="fa-solid fa-plus"></i> Nueva campaña</button>' : ''}</div></div>
       ${R.simuladores.whatsapp || R.simuladores.correo ? `<div class="aviso i"><i class="fa-solid fa-flask"></i> Modo simulador${R.simuladores.whatsapp && R.simuladores.correo ? '' : R.simuladores.whatsapp ? ' en WhatsApp' : ' en correo'}: no se envía nada real.</div>` : ''}
       <div class="kpis">
         <div class="card"><div class="b"><small style="color:var(--muted)">Aceptan WhatsApp</small><span class="cuenta">${fnum(R.clientes.whatsapp)}</span><small style="color:var(--muted)">de ${fnum(R.clientes.total)} clientes</small></div></div>
@@ -43,23 +80,95 @@
         <div class="card"><div class="b"><small style="color:var(--muted)">Bolsa de WhatsApp</small><span class="cuenta">${fnum(R.saldo.whatsapp)}</span><small style="color:var(--muted)">${R.whatsappListo ? 'mensajes disponibles' : 'WhatsApp de la empresa no activo'}</small></div></div>
         <div class="card"><div class="b"><small style="color:var(--muted)">Bolsa de correos</small><span class="cuenta">${fnum(R.saldo.correo)}</span><small style="color:var(--muted)">${R.correoListo ? 'correos disponibles' : 'Correo no configurado en el servidor'}</small></div></div>
       </div>
-      <div class="tabs" id="tabs"><button data-t="campanas">Campañas</button><button data-t="plantillas">Plantillas de WhatsApp</button></div>
-      <div class="card" id="cont"></div>`;
+      <div class="tabs" id="tabs"><button data-t="promo"><i class="fa-solid fa-bolt"></i> Promoción del día</button><button data-t="campanas">Campañas</button><button data-t="plantillas">Plantillas de WhatsApp</button><button data-t="ajustes">Ajustes</button></div>
+      <div id="cont"></div>`;
     $('nueva') && ($('nueva').onclick = () => editar());
     $('tabs').onclick = e => { const b = e.target.closest('[data-t]'); if (b) { pestaña = b.dataset.t; ver(); } };
     ver();
   }
   async function ver() {
     document.querySelectorAll('#tabs button').forEach(b => b.classList.toggle('on', b.dataset.t === pestaña));
+    const C = $('cont');
+    if (pestaña === 'promo') return verPromo(C);
+    if (pestaña === 'ajustes') return verAjustes(C);
+    C.innerHTML = '<div class="card" id="cc2"></div>';
+    const cont = $('cc2');
     if (pestaña === 'campanas') {
       const l = await datos('/marketing/campanas'); if (!l) return;
-      tabla($('cont'), [{ t: 'Campaña', f: c => `<b>${esc(c.nombre)}</b><small>${fecha(c.createdAt)}${c.creadaPor ? ' · ' + esc(c.creadaPor.nombre) : ''}</small>` }, { t: 'Canal', f: c => c.canal === 'whatsapp' ? '<i class="fa-brands fa-whatsapp" style="color:#25D366"></i> WhatsApp' : '<i class="fa-solid fa-envelope" style="color:var(--primary)"></i> Correo' }, { t: 'Segmento', f: c => esc(textoSeg(c.segmento || {})) }, { t: 'Estado', f: c => `<span class="bd ${EST[c.estado][1]}">${EST[c.estado][0]}</span>${c.estado === 'programada' && c.programadaPara ? `<small>${fecha(c.programadaPara)}</small>` : ''}${c.motivoPausa && c.estado === 'pausada' ? `<small>${esc(c.motivoPausa)}</small>` : ''}` }, { t: 'Enviados', n: 1, f: c => `${fnum(c.totales.enviados)} / ${fnum(c.totales.destinatarios)}` }], l, { vacio: 'Aún no hay campañas', icono: 'fa-bullhorn', clic: c => detalle(c._id) });
+      tabla(cont, [{ t: 'Campaña', f: c => `<b>${esc(c.nombre)}</b>${c.tipo === 'promo_dia' ? ' <span class="bd vi">Promo del día</span>' : ''}<small>${fecha(c.createdAt)}${c.creadaPor ? ' · ' + esc(c.creadaPor.nombre) : ''}</small>` }, { t: 'Canal', f: c => c.canal === 'whatsapp' ? '<i class="fa-brands fa-whatsapp" style="color:#25D366"></i> WhatsApp' : `<i class="fa-solid fa-envelope" style="color:var(--primary)"></i> Correo${c.formato === 'diseno' ? ' · diseño' : c.formato === 'html' ? ' · HTML' : ''}` }, { t: 'Segmento', f: c => esc(textoSeg(c.segmento || {})) }, { t: 'Estado', f: c => `<span class="bd ${EST[c.estado][1]}">${EST[c.estado][0]}</span>${c.estado === 'programada' && c.programadaPara ? `<small>${fecha(c.programadaPara)}</small>` : ''}${c.motivoPausa && c.estado === 'pausada' ? `<small>${esc(c.motivoPausa)}</small>` : ''}` }, { t: 'Enviados', n: 1, f: c => `${fnum(c.totales.enviados)} / ${fnum(c.totales.destinatarios)}` }], l, { vacio: 'Aún no hay campañas', icono: 'fa-bullhorn', clic: c => detalle(c._id) });
     } else {
       const ps = await datos('/marketing/plantillas'); if (!ps) return;
-      $('cont').innerHTML = `<header><h3>Plantillas de marketing</h3><p>WhatsApp solo permite iniciar conversaciones con plantillas aprobadas por Meta (suele tardar de minutos a 24 horas).</p>${ADM && R.whatsappListo ? '<div class="r"><button class="btn p sm" id="np"><i class="fa-solid fa-plus"></i> Nueva plantilla</button></div>' : ''}</header><div id="tp"></div>`;
-      tabla($('tp'), [{ t: 'Nombre', f: p => `<b>${esc(p.nombre)}</b><small>${fecha(p.creada)}</small>` }, { t: 'Texto', f: p => `<div class="vista" style="font-size:12.5px;max-width:520px">${esc(p.cuerpo).replace(/\{\{1\}\}/g, '<b>{nombre}</b>')}</div>` }, { t: 'Estado', f: p => `<span class="bd ${p.estado === 'aprobada' ? 'ok' : p.estado === 'rechazada' ? 'mal' : 'av'}">${{ aprobada: 'Aprobada', rechazada: 'Rechazada', pendiente: 'En revisión de Meta' }[p.estado] || p.estado}</span>${p.motivo ? `<small>${esc(p.motivo)}</small>` : ''}` }], ps, { vacio: 'No hay plantillas', icono: 'fa-comment-dots' });
+      cont.innerHTML = `<header><h3>Plantillas de marketing</h3><p>WhatsApp solo permite iniciar conversaciones con plantillas aprobadas por Meta (suele tardar de minutos a 24 horas).</p>${ADM && R.whatsappListo ? '<div class="r"><button class="btn p sm" id="np"><i class="fa-solid fa-plus"></i> Nueva plantilla</button></div>' : ''}</header><div id="tp"></div>`;
+      tabla($('tp'), [{ t: 'Nombre', f: p => `<b>${esc(p.nombre)}</b>${p.sistema === 'promo_dia' ? ' <span class="bd vi">Promoción del día</span>' : ''}<small>${fecha(p.creada)}</small>` }, { t: 'Texto', f: p => `<div class="vista" style="font-size:12.5px;max-width:520px">${esc(p.cuerpo).replace(/\{\{1\}\}/g, '<b>{nombre}</b>').replace(/\{\{2\}\}/g, '<b>{oferta}</b>').replace(/\{\{3\}\}/g, '<b>{enlace}</b>')}</div>` }, { t: 'Estado', f: p => `<span class="bd ${p.estado === 'aprobada' ? 'ok' : p.estado === 'rechazada' ? 'mal' : 'av'}">${{ aprobada: 'Aprobada', rechazada: 'Rechazada', pendiente: 'En revisión de Meta' }[p.estado] || p.estado}</span>${p.motivo ? `<small>${esc(p.motivo)}</small>` : ''}` }], ps, { vacio: 'No hay plantillas', icono: 'fa-comment-dots' });
       $('np') && ($('np').onclick = nuevaPlantilla);
     }
+  }
+
+  // ── Ajustes: límite por cliente ──
+  function verAjustes(C) {
+    C.innerHTML = `<div class="card"><header><h3>Cuidar a tus clientes</h3><p>Demasiados mensajes hacen que la gente bloquee tu número o se dé de baja, y Meta puede bajar la calidad de tu WhatsApp o restringirlo.</p></header><div class="b">
+      <div class="f" style="max-width:340px"><label>Máximo de mensajes de marketing por cliente a la semana (por canal)</label><input class="in" id="lim" type="number" min="0" max="14" value="${R.limiteSemanal}" ${ADM ? '' : 'disabled'}><small>Recomendado: 2. Con 0 no hay límite. Además, cada cliente recibe como máximo una promoción del día por día. Los avisos de pedidos no cuentan.</small></div>
+      ${ADM ? '<button class="btn p" id="glim" style="align-self:flex-start">Guardar</button>' : ''}</div></div>`;
+    $('glim') && ($('glim').onclick = async () => { const r = await datos('/marketing/config', 'PUT', { limiteSemanal: Number($('lim').value) }); if (r) { R.limiteSemanal = r.limiteSemanal; toast('Guardado'); } });
+  }
+
+  // ── Promoción del día ──
+  async function verPromo(C) {
+    const P = await datos('/marketing/promo-dia'); if (!P) return;
+    const pl = P.plantilla, pi = P.plantillaImagen;
+    const est = (x, t) => !x ? `<span class="bd av">${t}: falta</span>` : x.estado === 'aprobada' ? `<span class="bd ok">${t}: aprobada</span>` : x.estado === 'rechazada' ? `<span class="bd mal" title="${esc(x.motivo || '')}">${t}: rechazada</span>` : `<span class="bd av">${t}: en revisión</span>`;
+    const estadoWa = !P.whatsappListo ? '<span class="bd">WhatsApp no activo</span>' : `${est(pl, 'Texto')} ${est(pi, 'Con imagen')}`;
+    const waOk = P.whatsappListo && (pl?.estado === 'aprobada' || pi?.estado === 'aprobada');
+    C.innerHTML = `<div class="promo">
+      <div class="card"><header><h3><i class="fa-solid fa-bolt" style="color:var(--warning)"></i> Promoción del día</h3><p>Elige los productos y el precio de hoy. Katú arma el mensaje, aplica el descuento en tu POS y tu tienda solo ese día, y se lo envía a tus clientes.</p></header><div class="b">
+        <div class="f"><label>Agregar producto (hasta 4)</label><input class="in" id="pq" placeholder="Busca por nombre o código"><div class="busca-res" id="pr" hidden></div></div>
+        <div id="items"></div>
+        <div class="sec" style="margin-top:6px">Envío</div>
+        <label style="display:flex;gap:8px;align-items:center;font-size:13.5px"><input type="checkbox" id="cw" ${waOk ? 'checked' : 'disabled'}> <i class="fa-brands fa-whatsapp" style="color:#25D366"></i> WhatsApp ${estadoWa}</label>
+        ${P.whatsappListo && (!pl || !pi) && ADM ? `<div class="aviso i" style="margin:4px 0"><i class="fa-solid fa-circle-info"></i><div>Para enviarla por WhatsApp, Meta aprueba <b>una sola vez</b> las plantillas de la promoción del día: la de <b>texto</b> y la que lleva la <b>foto del primer producto</b> arriba (se usa cuando el producto tiene foto). ${!pl ? '<button class="btn sm" id="cpl">Crear la de texto</button>' : ''} ${!pi ? '<button class="btn sm p" id="cpi"><i class="fa-solid fa-image"></i> Crear la de imagen</button>' : ''}</div></div>` : ''}
+        <label style="display:flex;gap:8px;align-items:center;font-size:13.5px"><input type="checkbox" id="cco" ${P.correoListo ? 'checked' : 'disabled'}> <i class="fa-solid fa-envelope" style="color:var(--primary)"></i> Correo con diseño ${P.correoListo ? '' : '<span class="bd">no configurado</span>'}</label>
+        <div class="f"><label>Asunto del correo (opcional)</label><input class="in" id="pas" placeholder="{nombre}, la promoción de hoy"></div>
+        <div class="grid" id="pseg" style="grid-template-columns:1fr 1fr;gap:10px"></div>
+        <label style="display:flex;gap:8px;align-items:center;font-size:13.5px"><input type="checkbox" id="cdes" checked> Aplicar estos precios en el POS y la tienda en línea solo ese día</label>
+        <div class="grid" style="grid-template-columns:1fr 1fr;gap:10px"><div class="f"><label>¿Cuándo?</label><select class="in" id="pcu"><option value="ya">Ahora mismo</option><option value="luego">En una fecha y hora</option></select></div><div class="f" id="pfh" hidden><label>Fecha y hora</label><input class="in" type="datetime-local" id="pdt"></div></div>
+        <small style="color:var(--muted)">Cada cliente recibe máximo ${P.limiteSemanal || 'sin límite de'} mensajes de marketing por semana y una promoción del día por día (ajústalo en Ajustes).</small>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:6px"><button class="btn" id="pvis"><i class="fa-solid fa-eye"></i> Vista previa</button>${ADM ? '<button class="btn p" id="penv"><i class="fa-solid fa-paper-plane"></i> Programar promoción</button>' : ''}</div>
+      </div></div>
+      <div class="card"><header><h3>Así la verán tus clientes</h3></header><div class="b" id="pvista"><p style="color:var(--muted)">Agrega productos y toca <b>Vista previa</b>.</p></div></div>
+    </div>
+    <div class="card" style="margin-top:16px"><header><h3>Últimas promociones</h3></header><div id="pult"></div></div>`;
+    tabla($('pult'), [{ t: 'Promoción', f: c => `<b>${esc(c.nombre)}</b><small>${esc(c.promo?.texto || '')}</small>` }, { t: 'Canal', f: c => c.canal === 'whatsapp' ? 'WhatsApp' : 'Correo' }, { t: 'Estado', f: c => `<span class="bd ${EST[c.estado][1]}">${EST[c.estado][0]}</span>${c.programadaPara ? `<small>${fecha(c.programadaPara)}</small>` : ''}` }, { t: 'Enviados', n: 1, f: c => `${fnum(c.totales.enviados)} / ${fnum(c.totales.destinatarios)}` }], P.ultimas, { vacio: 'Aún no has enviado promociones del día', icono: 'fa-bolt', clic: c => detalle(c._id) });
+
+    const items = [];
+    const pintarItems = () => {
+      $('items').innerHTML = items.length ? items.map((x, i) => `<div class="item-p"><span><b>${esc(x.nombre)}</b><small>Precio normal ${dinero(x.precio)}</small></span><select class="in" data-k="tipo" data-i="${i}"><option value="precio" ${x.tipo === 'precio' ? 'selected' : ''}>Precio de hoy</option><option value="porcentaje" ${x.tipo === 'porcentaje' ? 'selected' : ''}>% de descuento</option></select><input class="in" data-k="valor" data-i="${i}" inputmode="decimal" value="${esc(x.valor ?? '')}" placeholder="${x.tipo === 'porcentaje' ? '20' : 'precio'}"><button class="ib d" data-q="${i}" title="Quitar"><i class="fa-solid fa-trash"></i></button></div>`).join('') : '<p style="color:var(--muted);font-size:13px">Aún no has agregado productos.</p>';
+    };
+    $('items').oninput = $('items').onchange = e => { const d = e.target.dataset; if (d.k) { items[d.i][d.k] = d.k === 'valor' ? e.target.value : e.target.value; if (d.k === 'tipo') pintarItems(); } };
+    $('items').onclick = e => { const b = e.target.closest('[data-q]'); if (b) { items.splice(Number(b.dataset.q), 1); pintarItems(); } };
+    buscadorProductos($('pq'), $('pr'), p => { if (items.length >= 4) return toast('Máximo 4 productos', 'mal'); if (items.some(x => x.producto === p._id)) return; items.push({ producto: p._id, nombre: p.nombre, precio: p.precio, tipo: 'precio', valor: '' }); pintarItems(); });
+    pintarItems();
+    const leerSeg = selectorSegmento($('pseg'), {});
+    $('pcu').onchange = () => { $('pfh').hidden = $('pcu').value !== 'luego'; };
+    const crearPl = imagen => async () => { if (await datos('/marketing/promo-dia/plantilla', 'POST', { imagen })) { toast('Plantilla enviada a Meta: suele aprobarse en minutos u horas'); verPromo(C); } };
+    $('cpl') && ($('cpl').onclick = crearPl(false));
+    $('cpi') && ($('cpi').onclick = crearPl(true));
+    const cuerpo = () => ({ items: items.map(x => ({ producto: x.producto, tipo: x.tipo, valor: Number(String(x.valor).replace(',', '.')) })), segmento: leerSeg(), asunto: $('pas').value, canales: [$('cw').checked && 'whatsapp', $('cco').checked && 'correo'].filter(Boolean), crearDescuento: $('cdes').checked, ...($('pcu').value === 'luego' && $('pdt').value && { cuando: new Date($('pdt').value).toISOString() }) });
+    $('pvis').onclick = async () => {
+      if (!items.length) return toast('Agrega al menos un producto', 'mal');
+      const v = await datos('/marketing/promo-dia/vista', 'POST', cuerpo()); if (!v) return;
+      $('pvista').innerHTML = `<div class="met" style="margin-bottom:12px"><div><small>Por WhatsApp</small><b>${fnum(v.destinatarios.whatsapp)}</b><small>de ${fnum(v.saldo.whatsapp)} en la bolsa</small></div><div><small>Por correo</small><b>${fnum(v.destinatarios.correo)}</b><small>de ${fnum(v.saldo.correo)} en la bolsa</small></div></div>
+        <label style="font-size:12px;font-weight:600;color:var(--muted)">WhatsApp ${v.whatsappImagen ? '· con imagen' : v.whatsapp ? '· solo texto' : ''}</label><div class="vista" style="margin:6px 0 14px;padding:${v.whatsappImagen ? '4px 4px 12px' : '12px 14px'}">${v.whatsappImagen ? `<img src="${esc(v.whatsappImagen)}" alt="" style="display:block;width:100%;max-height:260px;object-fit:cover;border-radius:9px;margin-bottom:8px">` : ''}<div style="padding:${v.whatsappImagen ? '0 10px' : '0'}">${v.whatsapp ? esc(v.whatsapp) : 'Aún no hay una plantilla aprobada.'}</div></div>${v.sinFoto && v.whatsapp ? '<small style="color:var(--muted);display:block;margin:-8px 0 12px">El primer producto no tiene foto: sale la plantilla de texto. Ponle una foto (JPG o PNG) en Productos para que salga con imagen.</small>' : ''}
+        <label style="font-size:12px;font-weight:600;color:var(--muted)">Correo · ${esc(v.correo.asunto)}</label><iframe id="pif" title="Vista previa del correo" style="width:100%;height:560px;border:1px solid var(--border);border-radius:12px;margin-top:6px"></iframe>`;
+      pintarIframe($('pif'), v.correo.html);
+    };
+    $('penv') && ($('penv').onclick = async () => {
+      const b = cuerpo();
+      if (!b.items.length) return toast('Agrega al menos un producto', 'mal');
+      if (!b.canales.length) return toast('Elige WhatsApp, correo o ambos', 'mal');
+      if (!(await confirmar('Programar promoción del día', `Se enviará por ${b.canales.map(c => c === 'whatsapp' ? 'WhatsApp' : 'correo').join(' y ')} ${b.cuando ? 'en la fecha elegida' : 'ahora mismo'}${b.crearDescuento ? ' y el descuento se aplicará en el POS y la tienda ese día' : ''}. Cada mensaje consume 1 de la bolsa.`, 'Programar'))) return;
+      const r = await datos('/marketing/promo-dia', 'POST', b);
+      if (r) { toast(`Promoción programada: ${r.campanas.map(c => `${fnum(c.destinatarios)} por ${c.canal === 'whatsapp' ? 'WhatsApp' : 'correo'}`).join(' y ')}`); verPromo(C); }
+    });
   }
 
   function nuevaPlantilla() {
@@ -69,28 +178,78 @@
     m.q('[data-s]').onclick = async () => { if (await datos('/marketing/plantillas', 'POST', { nombre: m.q('#pn').value, cuerpo: m.q('#pc').value })) { m.cerrar(); toast('Plantilla enviada a aprobación'); ver(); } };
   }
 
+  // ── Editor de bloques del correo ──
+  const NOM_BLOQUE = { titulo: ['Título', 'fa-heading'], texto: ['Texto', 'fa-align-left'], imagen: ['Imagen', 'fa-image'], boton: ['Botón', 'fa-hand-pointer'], productos: ['Productos', 'fa-basket-shopping'], separador: ['Separador', 'fa-minus'], espacio: ['Espacio', 'fa-arrows-up-down'] };
+  const NUEVO = { titulo: () => ({ tipo: 'titulo', texto: '¡Ofertas para ti!', tamano: 28, alinear: 'center' }), texto: () => ({ tipo: 'texto', texto: 'Hola {nombre}, esta semana tenemos *precios especiales*.', alinear: 'left' }), imagen: () => ({ tipo: 'imagen', url: '', enlace: '', alt: '', ancho: 100 }), boton: () => ({ tipo: 'boton', texto: 'Comprar ahora', enlace: R.tienda, alinear: 'center' }), productos: () => ({ tipo: 'productos', productos: [], columnas: 2, _nombres: {} }), separador: () => ({ tipo: 'separador' }), espacio: () => ({ tipo: 'espacio', alto: 24 }) };
+  function editorBloques(cont, bloques, alCambiar) {
+    const al = (b, i) => `<select class="in" data-i="${i}" data-c="alinear"><option value="left" ${b.alinear === 'left' ? 'selected' : ''}>Izquierda</option><option value="center" ${b.alinear === 'center' ? 'selected' : ''}>Centro</option><option value="right" ${b.alinear === 'right' ? 'selected' : ''}>Derecha</option></select>`;
+    const campos = (b, i) => {
+      switch (b.tipo) {
+        case 'titulo': return `<input class="in" data-i="${i}" data-c="texto" value="${esc(b.texto)}"><div class="grid" style="grid-template-columns:1fr 1fr;gap:6px"><select class="in" data-i="${i}" data-c="tamano" data-n="1"><option value="22" ${b.tamano == 22 ? 'selected' : ''}>Mediano</option><option value="28" ${b.tamano == 28 ? 'selected' : ''}>Grande</option><option value="34" ${b.tamano == 34 ? 'selected' : ''}>Muy grande</option></select>${al(b, i)}</div>`;
+        case 'texto': return `<textarea class="in" data-i="${i}" data-c="texto" style="min-height:80px">${esc(b.texto)}</textarea>${al(b, i)}<small style="color:var(--muted)">{nombre} = nombre del cliente · *negrita* · _cursiva_</small>`;
+        case 'imagen': return `<input class="in" data-i="${i}" data-c="url" value="${esc(b.url)}" placeholder="https://… dirección de la imagen (JPG o PNG)"><input class="in" data-i="${i}" data-c="enlace" value="${esc(b.enlace)}" placeholder="Enlace al tocarla (opcional)"><div class="grid" style="grid-template-columns:1fr 1fr;gap:6px"><input class="in" data-i="${i}" data-c="alt" value="${esc(b.alt)}" placeholder="Descripción"><select class="in" data-i="${i}" data-c="ancho" data-n="1">${[100, 75, 50].map(w => `<option value="${w}" ${b.ancho == w ? 'selected' : ''}>Ancho ${w}%</option>`).join('')}</select></div>`;
+        case 'boton': return `<div class="grid" style="grid-template-columns:1fr 1fr;gap:6px"><input class="in" data-i="${i}" data-c="texto" value="${esc(b.texto)}"><input class="in" type="color" data-i="${i}" data-c="color" value="${esc(b.color || R.color || '#05C3DD')}"></div><input class="in" data-i="${i}" data-c="enlace" value="${esc(b.enlace)}" placeholder="https://…">${al(b, i)}`;
+        case 'productos': return `<div class="chips-p">${b.productos.map((id, k) => `<span>${esc(b._nombres?.[id] || 'Producto')} <button type="button" data-qp="${i}|${k}">✕</button></span>`).join('') || '<small style="color:var(--muted)">Agrega hasta 6 productos del catálogo (con su foto y precio).</small>'}</div><input class="in" data-busca="${i}" placeholder="Buscar producto"><div class="busca-res" data-res="${i}" hidden></div><select class="in" data-i="${i}" data-c="columnas" data-n="1">${[1, 2, 3].map(n => `<option value="${n}" ${b.columnas == n ? 'selected' : ''}>${n} por fila</option>`).join('')}</select>`;
+        case 'espacio': return `<input class="in" type="range" min="8" max="80" data-i="${i}" data-c="alto" data-n="1" value="${b.alto}">`;
+        default: return '';
+      }
+    };
+    const pintar = () => {
+      cont.innerHTML = bloques.map((b, i) => `<div class="bloque"><div class="bh"><i class="fa-solid ${NOM_BLOQUE[b.tipo][1]}"></i><span>${NOM_BLOQUE[b.tipo][0]}</span><button class="ib" type="button" data-m="${i}|-1" title="Subir"><i class="fa-solid fa-arrow-up"></i></button><button class="ib" type="button" data-m="${i}|1" title="Bajar"><i class="fa-solid fa-arrow-down"></i></button><button class="ib d" type="button" data-x="${i}" title="Quitar"><i class="fa-solid fa-trash"></i></button></div>${campos(b, i)}</div>`).join('') + `<div class="add-bloques">${Object.entries(NOM_BLOQUE).map(([k, [t, ic]]) => `<button class="btn sm" type="button" data-add="${k}"><i class="fa-solid ${ic}"></i> ${t}</button>`).join('')}</div>`;
+      cont.querySelectorAll('[data-busca]').forEach(inp => { const i = Number(inp.dataset.busca); buscadorProductos(inp, cont.querySelector(`[data-res="${i}"]`), p => { const b = bloques[i]; if (b.productos.length >= 6 || b.productos.includes(p._id)) return; b.productos.push(p._id); b._nombres = { ...(b._nombres || {}), [p._id]: p.nombre }; pintar(); alCambiar(); }); });
+    };
+    cont.oninput = cont.onchange = e => { const d = e.target.dataset; if (d.c === undefined || d.i === undefined) return; bloques[d.i][d.c] = d.n ? Number(e.target.value) : e.target.value; alCambiar(); };
+    cont.onclick = e => {
+      const t = e.target.closest('button'); if (!t) return;
+      if (t.dataset.add) { bloques.push(NUEVO[t.dataset.add]()); pintar(); alCambiar(); }
+      else if (t.dataset.x !== undefined) { bloques.splice(Number(t.dataset.x), 1); pintar(); alCambiar(); }
+      else if (t.dataset.m) { const [i, d] = t.dataset.m.split('|').map(Number), j = i + d; if (j < 0 || j >= bloques.length) return; [bloques[i], bloques[j]] = [bloques[j], bloques[i]]; pintar(); alCambiar(); }
+      else if (t.dataset.qp) { const [i, k] = t.dataset.qp.split('|').map(Number); bloques[i].productos.splice(k, 1); pintar(); alCambiar(); }
+    };
+    pintar();
+  }
+  const PLANTILLA_DISENO = () => [{ tipo: 'titulo', texto: '¡Hola {nombre}!', tamano: 34, alinear: 'center' }, { tipo: 'texto', texto: 'Esta semana tenemos *precios especiales* para ti. ¡No te los pierdas!', alinear: 'center' }, { tipo: 'imagen', url: '', enlace: '', alt: '', ancho: 100 }, { tipo: 'boton', texto: 'Ver ofertas', enlace: R.tienda, alinear: 'center' }];
+
   function editar(c = null) {
-    const aprobadas = R.plantillas.filter(p => p.estado === 'aprobada');
+    const aprobadas = R.plantillas.filter(p => p.estado === 'aprobada' && !p.sistema);
+    let bloques = Array.isArray(c?.bloques) && c.bloques.length ? JSON.parse(JSON.stringify(c.bloques)) : PLANTILLA_DISENO();
     const m = modal({ clase: 'l', titulo: c ? 'Editar campaña' : 'Nueva campaña', html: `<div class="grid">
       <div class="f"><label>Nombre</label><input class="in" id="cn" value="${esc(c?.nombre || '')}" placeholder="Promo fin de semana"></div>
       <div class="f"><label>Canal</label><select class="in" id="cc"><option value="whatsapp">WhatsApp (plantilla aprobada)</option><option value="correo">Correo</option></select></div>
-      <div class="f"><label>¿A quién?</label><select class="in" id="st">${Object.entries(SEG).filter(([k]) => k !== 'nivel' || R.niveles.length).map(([k, t]) => `<option value="${k}">${t}</option>`).join('')}</select></div>
-      <div class="f" id="sp"></div>
+      <div style="grid-column:span 12" class="grid" id="segc"></div>
       <div style="grid-column:span 12" class="aviso i" id="cuenta"><i class="fa-solid fa-users"></i> Calculando…</div>
       <div class="f wa" style="grid-column:span 12"><label>Plantilla</label><select class="in" id="pl">${aprobadas.map(p => `<option value="${esc(p.contentSid)}">${esc(p.nombre)}</option>`).join('') || '<option value="">No hay plantillas aprobadas</option>'}</select></div>
       <div class="f wa" style="grid-column:span 12"><label>Vista previa</label><div class="vista" id="vw"></div></div>
-      <div class="f co" style="grid-column:span 12"><label>Asunto</label><input class="in" id="as" value="${esc(c?.asunto || '')}" placeholder="{nombre}, esta semana tenemos ofertas para ti"></div>
-      <div class="f co" style="grid-column:span 12"><label>Mensaje</label><textarea class="in" id="cu" style="min-height:150px" placeholder="Hola {nombre}:&#10;&#10;Esta semana tenemos *20% de descuento* en frutas y verduras.">${esc(c?.cuerpo || '')}</textarea><small>{nombre} se reemplaza por el nombre del cliente. *texto* va en negrita. El correo lleva el logo y los colores de la empresa, y el enlace para darse de baja.</small></div>
+      <div class="f co" style="grid-column:span 6"><label>Asunto</label><input class="in" id="as" value="${esc(c?.asunto || '')}" placeholder="{nombre}, esta semana tenemos ofertas para ti"></div>
+      <div class="f co" style="grid-column:span 6"><label>Texto de vista previa (opcional)</label><input class="in" id="ph" value="${esc(c?.preheader || '')}" placeholder="Se ve junto al asunto en la bandeja de entrada"></div>
+      <div class="f co" style="grid-column:span 12"><label>Formato</label><div class="chips" id="fmt"><button type="button" class="chip" data-f="diseno"><i class="fa-solid fa-palette"></i> Diseño</button><button type="button" class="chip" data-f="texto"><i class="fa-solid fa-align-left"></i> Texto simple</button><button type="button" class="chip" data-f="html"><i class="fa-solid fa-code"></i> HTML propio</button></div></div>
+      <div class="co" style="grid-column:span 12"><div class="ed-correo">
+        <div>
+          <div class="ftexto"><textarea class="in" id="cu" style="min-height:220px" placeholder="Hola {nombre}:&#10;&#10;Esta semana tenemos *20% de descuento* en frutas y verduras.">${esc(c?.cuerpo && c?.formato !== 'diseno' && c?.formato !== 'html' ? c.cuerpo : '')}</textarea><small style="color:var(--muted)">{nombre} se reemplaza por el nombre del cliente. *texto* va en negrita. Lleva el logo y los colores de la empresa.</small></div>
+          <div class="fdiseno"><div class="f" style="margin-bottom:8px"><label>Color principal</label><input class="in" type="color" id="col" value="${esc(c?.colorCorreo || R.color || '#05C3DD')}" style="max-width:120px"></div><div id="blq"></div></div>
+          <div class="fhtml"><textarea class="in" id="htm" style="min-height:420px;font-family:monospace;font-size:12px" placeholder="Pega aquí el HTML de tu correo (por ejemplo, exportado de Canva, Mailchimp o Stripo).">${esc(c?.formato === 'html' ? c.html || '' : '')}</textarea><small style="color:var(--muted)">Por seguridad se quitan scripts, formularios e iframes. Se agrega solo el pie con tus datos y el enlace para darse de baja. Usa {nombre} para el nombre del cliente. Las imágenes deben estar en direcciones https.</small></div>
+        </div>
+        <div><label style="font-size:12px;font-weight:600;color:var(--muted)">Vista previa del correo</label><iframe id="vcorreo" title="Vista previa del correo"></iframe></div>
+      </div></div>
     </div>`, pie: '<button class="btn" data-g>Guardar borrador</button><button class="btn" data-t><i class="fa-solid fa-vial"></i> Enviarme una prueba</button><button class="btn p" data-p><i class="fa-solid fa-paper-plane"></i> Programar envío</button>' });
-    if (c) { m.q('#cc').value = c.canal; m.q('#st').value = c.segmento?.tipo || 'todos'; if (c.plantilla) m.q('#pl').value = c.plantilla; }
-    const seg = () => { const t = m.q('#st').value; return { tipo: t, ...(['recientes', 'inactivos'].includes(t) && { dias: Number(m.q('#sd')?.value) || 30 }), ...(t === 'frecuentes' && { compras: Number(m.q('#sc')?.value) || 5 }), ...(t === 'nivel' && { nivel: m.q('#sn')?.value }) }; };
-    const verSeg = () => { const t = m.q('#st').value; m.q('#sp').innerHTML = ['recientes', 'inactivos'].includes(t) ? `<label>Días</label><input class="in" id="sd" type="number" min="1" value="${c?.segmento?.dias || 30}">` : t === 'frecuentes' ? `<label>Compras mínimas</label><input class="in" id="sc" type="number" min="1" value="${c?.segmento?.compras || 5}">` : t === 'nivel' ? `<label>Nivel</label><select class="in" id="sn">${R.niveles.map(n => `<option ${c?.segmento?.nivel === n ? 'selected' : ''}>${esc(n)}</option>`).join('')}</select>` : ''; contar(); };
-    let tc; const contar = () => { clearTimeout(tc); tc = setTimeout(async () => { const canal = m.q('#cc').value; const r = await api('/marketing/segmento', 'POST', { canal, segmento: seg() }); if (!r.success) return; const saldo = R.saldo[canal]; m.q('#cuenta').innerHTML = `<i class="fa-solid fa-users"></i> <span><b>${fnum(r.data.total)}</b> clientes recibirán esta campaña (consume ${fnum(r.data.total)} de ${fnum(saldo)} en la bolsa).${r.data.total > saldo ? ' <b>La bolsa no alcanza:</b> la campaña se pausará al agotarse.' : ''}</span>`; }, 250); };
-    const verCanal = () => { const wa = m.q('#cc').value === 'whatsapp'; m.qq('.wa').forEach(x => { x.hidden = !wa; }); m.qq('.co').forEach(x => { x.hidden = wa; }); verPl(); contar(); };
+    let formato = c?.formato || (c ? 'texto' : 'diseno');
+    if (c) { m.q('#cc').value = c.canal; if (c.plantilla) m.q('#pl').value = c.plantilla; }
+    let tc; const contar = () => { clearTimeout(tc); tc = setTimeout(async () => { const canal = m.q('#cc').value; const r = await api('/marketing/segmento', 'POST', { canal, segmento: leerSeg() }); if (!r.success) return; const saldo = R.saldo[canal]; m.q('#cuenta').innerHTML = `<i class="fa-solid fa-users"></i> <span><b>${fnum(r.data.total)}</b> clientes recibirán esta campaña (consume hasta ${fnum(r.data.total)} de ${fnum(saldo)} en la bolsa; se respeta el límite de ${R.limiteSemanal || 'sin'} mensajes por semana).${r.data.total > saldo ? ' <b>La bolsa no alcanza:</b> la campaña se pausará al agotarse.' : ''}</span>`; }, 250); };
+    const leerSeg = selectorSegmento(m.q('#segc'), c?.segmento || {}, contar);
+    const datosCorreo = () => ({ formato, asunto: m.q('#as').value, preheader: m.q('#ph').value, cuerpo: m.q('#cu').value, html: m.q('#htm').value, colorCorreo: m.q('#col').value, bloques: bloques.map(({ _nombres, ...b }) => b) });
+    const previsualizar = debounce(async () => {
+      if (m.q('#cc').value !== 'correo') return;
+      const r = await api('/marketing/vista-correo', 'POST', { ...datosCorreo(), asunto: m.q('#as').value || 'Vista previa' });
+      pintarIframe(m.q('#vcorreo'), r.success ? r.data.html : `<p style="font-family:Arial;padding:20px;color:#8A97AB">${esc(r.error || 'Completa el correo para ver la vista previa')}</p>`);
+    }, 500);
+    editorBloques(m.q('#blq'), bloques, previsualizar);
+    const verFormato = () => { m.qq('#fmt .chip').forEach(b => b.classList.toggle('on', b.dataset.f === formato)); m.q('.ftexto').hidden = formato !== 'texto'; m.q('.fdiseno').hidden = formato !== 'diseno'; m.q('.fhtml').hidden = formato !== 'html'; previsualizar(); };
+    m.q('#fmt').onclick = e => { const b = e.target.closest('[data-f]'); if (b) { formato = b.dataset.f; verFormato(); } };
+    ['#cu', '#htm', '#as', '#ph', '#col'].forEach(s => { m.q(s).addEventListener('input', previsualizar); });
+    const verCanal = () => { const wa = m.q('#cc').value === 'whatsapp'; m.qq('.wa').forEach(x => { x.hidden = !wa; }); m.qq('.co').forEach(x => { x.hidden = wa; }); verPl(); contar(); if (!wa) verFormato(); };
     const verPl = () => { const p = aprobadas.find(x => x.contentSid === m.q('#pl').value); m.q('#vw').textContent = p ? p.cuerpo.replace(/\{\{1\}\}/g, 'Valentina') : 'Crea una plantilla en la pestaña "Plantillas de WhatsApp" y espera la aprobación de Meta.'; };
-    m.q('#cc').onchange = verCanal; m.q('#st').onchange = verSeg; m.q('#pl').onchange = verPl;
-    m.q('#sp').oninput = contar;
-    const cuerpo = () => ({ nombre: m.q('#cn').value, canal: m.q('#cc').value, segmento: seg(), plantilla: m.q('#pl').value, asunto: m.q('#as').value, cuerpo: m.q('#cu').value });
+    m.q('#cc').onchange = verCanal; m.q('#pl').onchange = verPl;
+    const cuerpo = () => ({ nombre: m.q('#cn').value, canal: m.q('#cc').value, segmento: leerSeg(), plantilla: m.q('#pl').value, ...datosCorreo() });
     let id = c?._id;
     const guardar = async () => { const r = id ? await datos(`/marketing/campanas/${id}`, 'PUT', cuerpo()) : await datos('/marketing/campanas', 'POST', cuerpo()); if (r) id = r._id; return r; };
     m.q('[data-g]').onclick = async () => { if (await guardar()) { m.cerrar(); toast('Borrador guardado'); ver(); } };
@@ -114,7 +273,7 @@
         if (r) { x.cerrar(); m.cerrar(); toast(`Programada para ${fnum(r.destinatarios)} clientes${r.alcanza ? '' : ' (la bolsa no alcanza para todos)'}`); cargar(); }
       };
     };
-    verSeg(); verCanal();
+    verCanal();
   }
 
   async function detalle(id) {
@@ -122,10 +281,11 @@
     const p = c.porEstado || {}, a = c.atribucion;
     const m = modal({ clase: 'l', titulo: `${esc(c.nombre)} <span class="bd ${EST[c.estado][1]}" style="margin-left:8px">${EST[c.estado][0]}</span>`, html: `
       <p style="color:var(--muted);margin-bottom:14px">${c.canal === 'whatsapp' ? `WhatsApp · plantilla ${esc(c.plantillaNombre || '')}` : `Correo · ${esc(c.asunto || '')}`} · ${esc(textoSeg(c.segmento || {}))}${c.programadaPara ? ` · ${fecha(c.programadaPara)}` : ''}${c.motivoPausa && c.estado === 'pausada' ? `<br><b style="color:var(--warning)">${esc(c.motivoPausa)}</b>` : ''}</p>
-      <div class="met"><div><small>Destinatarios</small><b>${fnum(c.totales.destinatarios)}</b></div><div><small>Enviados</small><b>${fnum(c.totales.enviados)}</b></div>${c.canal === 'whatsapp' ? `<div><small>Entregados</small><b>${fnum((p.entregado || 0) + (p.leido || 0))}</b></div><div><small>Leídos</small><b>${fnum(p.leido || 0)}</b></div>` : ''}<div><small>Fallidos</small><b>${fnum(c.totales.fallidos)}</b></div><div><small>Omitidos (se dieron de baja)</small><b>${fnum(c.totales.omitidos)}</b></div></div>
+      <div class="met"><div><small>Destinatarios</small><b>${fnum(c.totales.destinatarios)}</b></div><div><small>Enviados</small><b>${fnum(c.totales.enviados)}</b></div>${c.canal === 'whatsapp' ? `<div><small>Entregados</small><b>${fnum((p.entregado || 0) + (p.leido || 0))}</b></div><div><small>Leídos</small><b>${fnum(p.leido || 0)}</b></div>` : ''}<div><small>Fallidos</small><b>${fnum(c.totales.fallidos)}</b></div><div><small>Omitidos (baja o límite semanal)</small><b>${fnum(c.totales.omitidos)}</b></div></div>
       <div class="card" style="margin-top:14px"><div class="b"><b>Ventas atribuidas</b><p style="color:var(--muted);font-size:12.5px">Compras de los destinatarios en los ${a.dias} días siguientes a su mensaje.</p><div class="met"><div><small>Clientes que compraron</small><b>${fnum(a.compradores)}</b></div><div><small>Compras</small><b>${fnum(a.ventas)}</b></div><div><small>Total vendido</small><b>${dinero(a.total)}</b></div></div></div></div>
-      <div style="margin-top:14px"><label style="font-size:12px;font-weight:600;color:var(--muted)">Mensaje</label><div class="vista" style="margin-top:6px">${esc(String(c.cuerpo || '').replace(/\{\{1\}\}/g, '{nombre}'))}</div></div>`,
-      pie: ADM ? `${['borrador', 'programada'].includes(c.estado) ? '<button class="btn" data-a="editar">Editar</button>' : ''}${['enviando', 'programada'].includes(c.estado) ? '<button class="btn" data-a="pausar"><i class="fa-solid fa-pause"></i> Pausar</button>' : ''}${c.estado === 'pausada' ? '<button class="btn p" data-a="reanudar"><i class="fa-solid fa-play"></i> Reanudar</button>' : ''}${['borrador', 'programada', 'pausada', 'enviando'].includes(c.estado) ? '<button class="btn d" data-a="cancelar">Cancelar campaña</button>' : ''}` : '' });
+      <div style="margin-top:14px"><label style="font-size:12px;font-weight:600;color:var(--muted)">Mensaje</label>${c.canal === 'correo' && c.formato !== 'texto' ? '<iframe id="dif" title="Correo" style="width:100%;height:520px;border:1px solid var(--border);border-radius:12px;margin-top:6px"></iframe>' : `<div class="vista" style="margin-top:6px">${esc(String(c.cuerpo || '').replace(/\{\{1\}\}/g, '{nombre}').replace(/\{\{2\}\}/g, c.variables?.[2] || '{oferta}').replace(/\{\{3\}\}/g, c.variables?.[3] || '{enlace}'))}</div>`}</div>`,
+      pie: ADM ? `${['borrador', 'programada'].includes(c.estado) && c.tipo !== 'promo_dia' ? '<button class="btn" data-a="editar">Editar</button>' : ''}${['enviando', 'programada'].includes(c.estado) ? '<button class="btn" data-a="pausar"><i class="fa-solid fa-pause"></i> Pausar</button>' : ''}${c.estado === 'pausada' ? '<button class="btn p" data-a="reanudar"><i class="fa-solid fa-play"></i> Reanudar</button>' : ''}${['borrador', 'programada', 'pausada', 'enviando'].includes(c.estado) ? '<button class="btn d" data-a="cancelar">Cancelar campaña</button>' : ''}` : '' });
+    if (m.q('#dif')) { const r = await api('/marketing/vista-correo', 'POST', { formato: c.formato, asunto: c.asunto, preheader: c.preheader, bloques: c.bloques, html: c.html, colorCorreo: c.colorCorreo, promo: c.promo }); pintarIframe(m.q('#dif'), r.success ? r.data.html : ''); }
     m.el.querySelector('footer')?.addEventListener('click', async e => {
       const ac = e.target.closest('[data-a]')?.dataset.a; if (!ac) return;
       if (ac === 'editar') { m.cerrar(); return editar(c); }

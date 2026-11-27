@@ -70,4 +70,10 @@ r.post('/seguimiento/:token/calificar', limitar({ max: 10 }), manejar(async req 
   return { gracias: true };
 }));
 
+// Imagen de la promoción del día (la descarga WhatsApp al enviar la plantilla con imagen)
+r.get('/promo-img/:clave', limitar({ max: 3000 }), async (req, res) => {
+  const img = await require('../utils/imagenPromo').obtener(req.params.clave);
+  res.set({ 'Content-Type': img.tipo, 'Cache-Control': 'public, max-age=3600' }).send(img.datos);
+});
+
 module.exports = r;

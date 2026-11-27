@@ -573,6 +573,73 @@ test('marketing: autorización por canal, plantillas, campañas por lotes, bolsa
   no(await api('mx', 'GET', '/marketing/campanas/' + cw._id), 403);
 });
 
+test('marketing: promoción del día (con imagen), correo con diseño y HTML propio, límite por cliente', async () => {
+  const e = await M('Empresa').findOne({ slug: 'orbita' }).lean();
+  const H = { 'x-empresa': String(e._id) };
+  const mk = require('../utils/marketing');
+  const vale = await M('Cliente').findOne({ empresa: e._id, documento: '1010101010' }).lean();
+  ok(await api('admin', 'PUT', `/clientes/${vale._id}`, { aceptaDatos: true, marketing: { whatsapp: true, correo: true } }));
+  ok(await api('super', 'POST', '/whatsapp/bolsa', { whatsapp: 20, correo: 20, motivo: 'Pruebas promo' }, H));
+  const [p1, p2] = await M('Producto').find({ empresa: e._id, activo: true, precio: { $gt: 1000 } }).sort({ nombre: 1 }).limit(2).lean();
+  await M('Producto').updateOne({ _id: p1._id }, { imagenUrl: 'https://imagenes.katupos.test/leche.jpg' });
+
+  // Plantillas reutilizables (texto y con imagen): se aprueban una vez
+  assert.equal(ok(await api('admin', 'GET', '/marketing/promo-dia')).plantilla, null);
+  no(await api('sup', 'POST', '/marketing/promo-dia/plantilla', {}), 403);
+  ok(await api('admin', 'POST', '/marketing/promo-dia/plantilla', {}));
+  ok(await api('admin', 'POST', '/marketing/promo-dia/plantilla', { imagen: true }));
+  const P = ok(await api('admin', 'GET', '/marketing/promo-dia'));
+  assert.deepEqual([P.plantilla.estado, P.plantillaImagen.estado], ['aprobada', 'aprobada']);
+
+  // Vista previa: oferta con precio del país, foto y correo armado
+  const items = [{ producto: p1._id, tipo: 'porcentaje', valor: 10 }, { producto: p2._id, tipo: 'precio', valor: p2.precio - 500 }];
+  no(await api('admin', 'POST', '/marketing/promo-dia/vista', { items: [{ producto: p1._id, tipo: 'precio', valor: p1.precio }] }), 400);
+  const v = ok(await api('admin', 'POST', '/marketing/promo-dia/vista', { items, segmento: { tipo: 'todos' } }));
+  assert.match(v.texto, new RegExp(`${p1.nombre}.*antes.* y ${p2.nombre}`));
+  assert.equal(v.whatsappImagen, 'https://imagenes.katupos.test/leche.jpg');
+  assert.ok(v.correo.html.includes(p1.nombre) && /Darme de baja/.test(v.correo.html) && /Valentina/.test(v.correo.html));
+
+  // Programar: descuento real solo hoy + campañas por WhatsApp (con imagen) y correo
+  const r = ok(await api('admin', 'POST', '/marketing/promo-dia', { items, canales: ['whatsapp', 'correo'], crearDescuento: true }));
+  assert.deepEqual([r.campanas.length, r.descuentos], [2, 2]);
+  const pr = await M('Promocion').findOne({ empresa: e._id, objetivos: p1._id }).sort({ createdAt: -1 }).lean();
+  assert.ok(pr.desde && pr.desde === pr.hasta && pr.tipo === 'precio' && pr.valor < p1.precio);
+  await mk.procesar(); await mk.procesar();
+  const cw = await M('Campana').findOne({ _id: r.campanas.find(c => c.canal === 'whatsapp')._id }).lean();
+  assert.deepEqual([cw.estado, cw.totales.enviados, cw.variables[4]], ['enviada', 1, `${e._id}-${p1._id}`]);
+  assert.equal(cw.plantilla, (await M('Empresa').findById(e._id).lean()).whatsapp.plantillasMarketing.find(x => x.sistema === 'promo_dia_img').contentSid);
+  assert.ok(await M('Mensaje').exists({ plantilla: cw.plantilla, texto: new RegExp(p2.nombre) }));
+  assert.equal((await M('Campana').findById(r.campanas.find(c => c.canal === 'correo')._id).lean()).estado, 'enviada');
+
+  // Otra promoción el mismo día: el cliente ya recibió la suya (no se satura)
+  const r2 = ok(await api('admin', 'POST', '/marketing/promo-dia', { items: [items[1]], canales: ['whatsapp'], crearDescuento: false }));
+  await mk.procesar(); await mk.procesar();
+  const omit = await M('EnvioCampana').findOne({ campana: r2.campanas[0]._id }).lean();
+  assert.deepEqual([omit.estado, omit.motivo], ['omitido', 'Ya recibió la promoción del día']);
+  no(await api('admin', 'PUT', '/marketing/config', { limiteSemanal: 20 }), 400);
+  assert.equal(ok(await api('admin', 'PUT', '/marketing/config', { limiteSemanal: 1 })).limiteSemanal, 1);
+  assert.equal(await mk.omitirPorLimite(await M('Empresa').findById(e._id).lean(), { canal: 'correo', tipo: 'normal' }, vale._id), 'Límite de 1 mensajes por semana');
+  ok(await api('admin', 'PUT', '/marketing/config', { limiteSemanal: 2 }));
+
+  // Correo con diseño: los bloques se limpian; los productos salen con foto y precio
+  const cd = ok(await api('admin', 'POST', '/marketing/campanas', { nombre: 'Diseño', canal: 'correo', formato: 'diseno', asunto: 'Hola {nombre}', bloques: [{ tipo: 'titulo', texto: 'Hola {nombre}' }, { tipo: 'productos', productos: [String(p1._id)] }, { tipo: 'boton', texto: 'Ir', enlace: 'https://orbita.katupos.test' }, { tipo: 'script', texto: 'x' }, { tipo: 'imagen', url: 'javascript:alert(1)' }] }));
+  assert.deepEqual(cd.bloques.map(b => b.tipo), ['titulo', 'productos', 'boton', 'imagen']);
+  assert.equal(cd.bloques[3].url, '');
+  const vd = ok(await api('admin', 'POST', '/marketing/vista-correo', { formato: 'diseno', asunto: 'x', bloques: cd.bloques }));
+  assert.ok(vd.html.includes('Hola Valentina') && vd.html.includes(p1.nombre) && vd.html.includes('leche.jpg'));
+
+  // HTML propio: sin scripts, eventos ni javascript:; con el pie de baja
+  const vh = ok(await api('admin', 'POST', '/marketing/vista-correo', { formato: 'html', asunto: 'x', html: '<html><body><h1>Hola {nombre}</h1><script>alert(1)</script><a href="javascript:robar()" onclick="x()">ver</a><iframe src="https://x"></iframe></body></html>' }));
+  assert.ok(vh.html.includes('Hola Valentina') && /Darme de baja/.test(vh.html));
+  assert.ok(!/<script|onclick|javascript:|<iframe/i.test(vh.html));
+
+  // La imagen de la plantilla la sirve Katú; nunca descarga direcciones internas
+  const img = await fetch(base + '/publico/promo-img/muestra');
+  assert.deepEqual([img.status, img.headers.get('content-type')], [200, 'image/png']);
+  const ip = require('../utils/imagenPromo').ipPrivada;
+  assert.deepEqual(['10.0.0.3', '127.0.0.1', '192.168.1.5', '8.8.8.8'].map(ip), [true, true, true, false]);
+});
+
 test('suscripción: landing → Stripe → alta automática, subdominio, mora, suspensión y bloqueos', async () => {
   const recibidosStripe = [];
   const st = http.createServer((req, res) => {
